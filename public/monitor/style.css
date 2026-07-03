@@ -1,0 +1,110 @@
+/* ==========================================================================
+   Monitor da House Mix  -  tela grande, para ser lida de longe
+   ========================================================================== */
+
+* { box-sizing: border-box; }
+
+:root {
+  --bg:       #08090d;
+  --bg2:      #12151d;
+  --bg3:      #1b202b;
+  --linha:    #2b3342;
+  --texto:    #f1f5f9;
+  --texto2:   #94a3b8;
+  --acento:   #3b82f6;
+  --verde:    #22c55e;
+  --amarelo:  #f59e0b;
+  --vermelho: #ef4444;
+}
+
+html, body {
+  margin: 0; height: 100%;
+  background: var(--bg); color: var(--texto);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.tela { display: none; height: 100vh; height: 100dvh; }
+.tela.ativa { display: flex; }
+
+/* ---------------- LOGIN ---------------- */
+#tela-login { align-items: center; justify-content: center; padding: 20px; }
+.login-box {
+  width: 100%; max-width: 420px;
+  background: var(--bg2); border: 1px solid var(--linha);
+  border-radius: 18px; padding: 32px 28px;
+}
+.login-box h1 { margin: 0 0 4px; font-size: 28px; }
+.subtitulo { margin: 0 0 24px; color: var(--texto2); }
+.campo { display: block; margin-bottom: 18px; }
+.campo span { display: block; font-size: 14px; color: var(--texto2); margin-bottom: 6px; }
+.campo input {
+  width: 100%; padding: 15px; font-size: 17px;
+  background: var(--bg3); color: var(--texto);
+  border: 1px solid var(--linha); border-radius: 12px; outline: none;
+}
+.campo input:focus { border-color: var(--acento); }
+.btn-primario {
+  padding: 15px 22px; font-size: 17px; font-weight: 600; color: #fff;
+  background: var(--acento); border: none; border-radius: 12px; cursor: pointer;
+}
+.btn-primario:active { filter: brightness(.9); }
+.erro { color: var(--vermelho); min-height: 20px; margin-top: 10px; }
+
+/* ---------------- MONITOR ---------------- */
+#tela-monitor { flex-direction: column; }
+
+.topo {
+  display: flex; align-items: center; gap: 20px;
+  padding: 16px 26px; background: var(--bg2); border-bottom: 2px solid var(--linha);
+}
+.topo h1 { margin: 0; font-size: 26px; color: var(--acento); letter-spacing: .5px; }
+.presenca { flex: 1; display: flex; align-items: center; gap: 10px; }
+.presenca-label { color: var(--texto2); font-size: 15px; }
+.lista-presenca { display: flex; flex-wrap: wrap; gap: 8px; }
+.lista-presenca .chip {
+  background: rgba(34,197,94,.15); color: var(--verde);
+  padding: 4px 12px; border-radius: 999px; font-size: 14px; font-weight: 600;
+}
+.lista-presenca .ninguem { color: var(--texto2); font-size: 14px; }
+.btn-limpar {
+  padding: 10px 16px; font-size: 14px; color: var(--texto2);
+  background: var(--bg3); border: 1px solid var(--linha); border-radius: 10px; cursor: pointer;
+}
+
+/* mensagens grandes */
+.mensagens {
+  flex: 1; overflow-y: auto; padding: 24px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+.vazio { color: var(--texto2); font-size: 20px; text-align: center; margin: auto; }
+
+.cartao {
+  background: var(--bg2); border: 1px solid var(--linha);
+  border-left: 6px solid var(--acento);
+  border-radius: 14px; padding: 18px 22px;
+  animation: entrar .25s ease-out;
+}
+.cartao.housemix { border-left-color: var(--amarelo); opacity: .85; }
+.cartao.urgente { border-left-color: var(--vermelho); }
+.cartao .cab { display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px; }
+.cartao .autor { font-size: 20px; font-weight: 700; }
+.cartao.housemix .autor { color: var(--amarelo); }
+.cartao .hora { color: var(--texto2); font-size: 14px; }
+.cartao .texto { font-size: 26px; line-height: 1.35; }
+
+@keyframes entrar {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* rodape de resposta */
+.resposta {
+  display: flex; gap: 12px; padding: 16px 24px;
+  background: var(--bg2); border-top: 2px solid var(--linha);
+}
+.resposta input {
+  flex: 1; padding: 15px; font-size: 16px;
+  background: var(--bg3); color: var(--texto);
+  border: 1px solid var(--linha); border-radius: 12px; outline: none;
+}
+.resposta input:focus { border-color: var(--acento); }

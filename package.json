@@ -1,0 +1,19 @@
+{
+  "name": "ui24-musicos",
+  "version": "1.0.0",
+  "description": "Interface de controle de monitor (fone) para musicos, conectada a uma Soundcraft Ui24R via servidor central, com chat para a house mix e monitor de mensagens.",
+  "type": "module",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "sim": "node server/ui24-simulator.js"
+  },
+  "author": "Grupo Elo / House Mix",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.61.1"
+  }
+}

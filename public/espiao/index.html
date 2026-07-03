@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Espiao da Mesa - Mapeamento</title>
+  <link rel="stylesheet" href="/espiao/style.css" />
+</head>
+<body>
+  <!-- LOGIN -->
+  <section id="tela-login" class="tela ativa">
+    <div class="login-box">
+      <h1>Espião da Mesa</h1>
+      <p class="subtitulo">Ferramenta para descobrir os números (id/aux) da sua Ui24R</p>
+      <label class="campo">
+        <span>Senha (a mesma da House Mix)</span>
+        <input id="inp-senha" type="password" placeholder="senha" autocomplete="off" />
+      </label>
+      <button id="btn-entrar" class="btn-primario">Entrar</button>
+      <p id="login-erro" class="erro"></p>
+    </div>
+  </section>
+
+  <!-- ESPIAO -->
+  <section id="tela-espiao" class="tela">
+    <header class="topo">
+      <div>
+        <h1>Espião da Mesa <span id="badge-mesa" class="badge badge-off">mesa off</span></h1>
+        <p class="dica">
+          Mexa <strong>um fader por vez</strong> na interface oficial da mesa (ou nos faders físicos)
+          e veja aqui qual <strong>id</strong> e <strong>aux</strong> usar no config.js.
+        </p>
+      </div>
+      <div class="controles">
+        <label class="chk"><input type="checkbox" id="chk-so-conhecidos" checked /> Só comandos de canal/fone</label>
+        <button id="btn-limpar" class="btn-sec">Limpar</button>
+        <button id="btn-pausar" class="btn-sec">Pausar</button>
+      </div>
+    </header>
+
+    <div class="cabecalho-tabela">
+      <span class="col-hora">Hora</span>
+      <span class="col-dir">Dir</span>
+      <span class="col-trad">O que significa</span>
+      <span class="col-cru">Comando cru</span>
+    </div>
+    <main id="lista" class="lista"></main>
+  </section>
+
+  <script src="/espiao/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Monitor - House Mix</title>
+  <link rel="stylesheet" href="/monitor/style.css" />
+</head>
+<body>
+  <!-- ===================== LOGIN ===================== -->
+  <section id="tela-login" class="tela ativa">
+    <div class="login-box">
+      <h1>Monitor da House Mix</h1>
+      <p class="subtitulo">Tela de mensagens dos musicos</p>
+      <label class="campo">
+        <span>Senha</span>
+        <input id="inp-senha" type="password" placeholder="senha" autocomplete="off" />
+      </label>
+      <button id="btn-entrar" class="btn-primario">Entrar</button>
+      <p id="login-erro" class="erro"></p>
+    </div>
+  </section>
+
+  <!-- ===================== MONITOR ===================== -->
+  <section id="tela-monitor" class="tela">
+    <header class="topo">
+      <h1>House Mix</h1>
+      <div class="presenca">
+        <span class="presenca-label">Online:</span>
+        <div id="lista-presenca" class="lista-presenca"><span class="ninguem">ninguem</span></div>
+      </div>
+      <button id="btn-limpar" class="btn-limpar" title="Limpar tela">Limpar</button>
+    </header>
+
+    <main id="mensagens" class="mensagens">
+      <div class="vazio">Aguardando mensagens dos musicos…</div>
+    </main>
+
+    <footer class="resposta">
+      <input id="resp-input" type="text" placeholder="Responder a todos (opcional)…" maxlength="300" />
+      <button id="resp-enviar" class="btn-primario">Responder</button>
+    </footer>
+  </section>
+
+  <script src="/monitor/app.js"></script>
+</body>
+</html>

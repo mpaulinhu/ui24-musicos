@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0d0f14" />
+  <title>Mix de Fone - Musico</title>
+  <link rel="stylesheet" href="/musico/style.css" />
+</head>
+<body>
+  <!-- ===================== TELA DE LOGIN ===================== -->
+  <section id="tela-login" class="tela ativa">
+    <div class="login-box">
+      <h1>Mix de Fone</h1>
+      <p class="subtitulo">Selecione seu instrumento e entre</p>
+
+      <label class="campo">
+        <span>Musico</span>
+        <select id="sel-musico"></select>
+      </label>
+
+      <label class="campo">
+        <span>Senha</span>
+        <input id="inp-senha" type="password" inputmode="numeric" placeholder="••••" autocomplete="off" />
+      </label>
+
+      <button id="btn-entrar" class="btn-primario">Entrar</button>
+      <p id="login-erro" class="erro"></p>
+
+      <div id="status-mesa" class="status-mesa">Conectando ao servidor…</div>
+    </div>
+  </section>
+
+  <!-- ===================== TELA PRINCIPAL ===================== -->
+  <section id="tela-mixer" class="tela">
+    <header class="topo">
+      <div class="topo-info">
+        <strong id="nome-musico">—</strong>
+        <span id="badge-mesa" class="badge badge-off">mesa off</span>
+      </div>
+      <div class="topo-abas">
+        <button class="aba ativa" data-aba="mix">Mix</button>
+        <button class="aba" data-aba="chat">Chat <span id="chat-badge" class="chat-badge oculto">0</span></button>
+      </div>
+    </header>
+
+    <!-- ---- ABA MIX ---- -->
+    <div id="painel-mix" class="painel ativo">
+      <div class="master-fone">
+        <label>Volume geral do meu fone</label>
+        <input id="master-slider" class="master-slider" type="range" min="0" max="100" value="75" />
+        <span id="master-valor" class="master-valor">75%</span>
+      </div>
+      <div id="faders" class="faders"><!-- gerado por JS --></div>
+    </div>
+
+    <!-- ---- ABA CHAT ---- -->
+    <div id="painel-chat" class="painel">
+      <div class="chat-info">Chat geral: todos os músicos e a House Mix veem estas mensagens.</div>
+      <div id="chat-mensagens" class="chat-mensagens"></div>
+      <div class="chat-rapidas">
+        <button class="rapida" data-msg="Pode aumentar minha voz no meu fone?">+ minha voz</button>
+        <button class="rapida" data-msg="Pode diminuir o click?">- click</button>
+        <button class="rapida" data-msg="Meu fone esta muito baixo.">fone baixo</button>
+        <button class="rapida" data-msg="Esta com microfonia!">microfonia!</button>
+      </div>
+      <div class="chat-envio">
+        <input id="chat-input" type="text" placeholder="Escreva para a House Mix…" maxlength="300" />
+        <button id="chat-enviar" class="btn-primario">Enviar</button>
+      </div>
+    </div>
+  </section>
+
+  <script src="/musico/app.js"></script>
+</body>
+</html>
