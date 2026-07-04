@@ -4,42 +4,56 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Monitor - House Mix</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/monitor/style.css" />
 </head>
 <body>
   <!-- ===================== LOGIN ===================== -->
   <section id="tela-login" class="tela ativa">
     <div class="login-box">
-      <h1>Monitor da House Mix</h1>
-      <p class="subtitulo">Tela de mensagens dos musicos</p>
+      <div class="parafuso p-tl"></div><div class="parafuso p-tr"></div>
+      <div class="parafuso p-bl"></div><div class="parafuso p-br"></div>
+      <span class="login-eyebrow">MONITOR MIX · HOUSE</span>
+      <h1>House Mix</h1>
+      <p class="subtitulo">Tela de mensagens dos músicos</p>
       <label class="campo">
-        <span>Senha</span>
+        <span>SENHA</span>
         <input id="inp-senha" type="password" placeholder="senha" autocomplete="off" />
       </label>
-      <button id="btn-entrar" class="btn-primario">Entrar</button>
+      <button id="btn-entrar" class="btn-primario">ENTRAR</button>
       <p id="login-erro" class="erro"></p>
     </div>
   </section>
 
   <!-- ===================== MONITOR ===================== -->
   <section id="tela-monitor" class="tela">
-    <header class="topo">
-      <h1>House Mix</h1>
-      <div class="presenca">
-        <span class="presenca-label">Online:</span>
-        <div id="lista-presenca" class="lista-presenca"><span class="ninguem">ninguem</span></div>
-      </div>
-      <button id="btn-limpar" class="btn-limpar" title="Limpar tela">Limpar</button>
-    </header>
+    <div class="console">
+      <div class="parafuso p-tl"></div><div class="parafuso p-tr"></div>
+      <div class="parafuso p-bl"></div><div class="parafuso p-br"></div>
 
-    <main id="mensagens" class="mensagens">
-      <div class="vazio">Aguardando mensagens dos musicos…</div>
-    </main>
+      <header class="topo">
+        <div class="topo-titulo">
+          <span class="eyebrow">MONITOR MIX · HOUSE</span>
+          <strong>House Mix</strong>
+        </div>
+        <div class="presenca">
+          <span class="presenca-label">ONLINE</span>
+          <div id="lista-presenca" class="lista-presenca"><span class="ninguem">ninguém</span></div>
+        </div>
+        <button id="btn-limpar" class="btn-limpar">LIMPAR</button>
+      </header>
 
-    <footer class="resposta">
-      <input id="resp-input" type="text" placeholder="Responder a todos (opcional)…" maxlength="300" />
-      <button id="resp-enviar" class="btn-primario">Responder</button>
-    </footer>
+      <main id="mensagens" class="mensagens">
+        <div class="vazio">Aguardando mensagens dos músicos…</div>
+      </main>
+
+      <footer class="resposta">
+        <input id="resp-input" type="text" placeholder="Responder a todos (opcional)…" maxlength="300" />
+        <button id="resp-enviar" class="btn-enviar">RESPONDER</button>
+      </footer>
+    </div>
   </section>
 
   <script src="/monitor/app.js"></script>

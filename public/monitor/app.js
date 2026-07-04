@@ -88,7 +88,7 @@ function mostrarMensagem(msg) {
 
 function mostrarPresenca(lista) {
   const el = $('#lista-presenca');
-  if (!lista.length) { el.innerHTML = '<span class="ninguem">ninguem</span>'; return; }
+  if (!lista.length) { el.innerHTML = '<span class="ninguem">ninguém</span>'; return; }
   el.innerHTML = '';
   for (const p of lista) {
     const chip = document.createElement('span');

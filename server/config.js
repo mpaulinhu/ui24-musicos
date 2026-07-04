@@ -11,6 +11,49 @@
 //  Depois de editar, basta reiniciar o servidor (npm start).
 // ============================================================================
 
+// ----------------------------------------------------------------------------
+//  LISTA DE CANAIS DA MESA (mapeada dos rotulos reais da Ui24R)
+//  CH da mesa - 1 = id aqui. Todos os fones usam esta mesma lista.
+//  Se quiser que um musico veja MENOS canais, e so criar uma lista propria
+//  para ele em vez de usar 'canaisTodos'.
+//
+//  "parceiro": para canais que sao um PAR ESTEREO (ex: microfone/overhead em
+//  L+R), aponta para o id do outro lado do par. A interface do musico move os
+//  dois faders juntos quando o musico mexe em qualquer um dos dois.
+//
+//  "tipo"/"canalMesa": canais especiais que NAO fazem parte da numeracao
+//  normal 1-24 da mesa (ex: Line In). "id" e' so o identificador interno
+//  (usado pela interface/protocolo do app); "canalMesa" e' o indice REAL na
+//  mesa dentro do seu proprio "tipo". Se omitidos, tipo="i" e canalMesa=id
+//  (comportamento padrao dos canais normais abaixo).
+// ----------------------------------------------------------------------------
+const canaisTodos = [
+  { id: 0,  nome: 'Guitarra' },                    // CH 1
+  { id: 1,  nome: 'Baixo' },                       // CH 2
+  { id: 2,  nome: 'Talk' },                        // CH 3
+  { id: 3,  nome: 'Pratos L', parceiro: 4 },       // CH 4  (estereo com CH 5)
+  { id: 4,  nome: 'Pratos R', parceiro: 3 },       // CH 5  (estereo com CH 4)
+  { id: 5,  nome: 'Caixa' },                       // CH 6
+  { id: 6,  nome: 'Bumbo' },                       // CH 7
+  { id: 7,  nome: 'Tom' },                         // CH 8
+  { id: 8,  nome: 'Surdo' },                       // CH 9
+  { id: 9,  nome: 'Teclado 1', parceiro: 10 },     // CH 10 (estereo com CH 11)
+  { id: 10, nome: 'Teclado 2', parceiro: 9 },      // CH 11 (estereo com CH 10)
+  { id: 11, nome: 'Teclado 3' },                   // CH 12 (mono, independente)
+  { id: 12, nome: 'Azul' },                        // CH 13
+  { id: 13, nome: 'Verde' },                       // CH 14
+  { id: 14, nome: 'Amarelo' },                     // CH 15
+  { id: 15, nome: 'Vermelho' },                    // CH 16
+  { id: 16, nome: 'Branco' },                      // CH 17
+  { id: 17, nome: 'Coringa' },                     // CH 18
+  { id: 18, nome: 'Condensador L', parceiro: 19 }, // CH 19 (estereo com CH 20)
+  { id: 19, nome: 'Condensador R', parceiro: 18 }, // CH 20 (estereo com CH 19)
+  // Line In (entrada RCA do PC) — nao faz parte dos 24 canais normais da
+  // mesa; usa o tipo "l" (l.0/l.1 no protocolo), ja estereo.
+  { id: 20, nome: 'Line In L', tipo: 'l', canalMesa: 0, parceiro: 21 },
+  { id: 21, nome: 'Line In R', tipo: 'l', canalMesa: 1, parceiro: 20 },
+];
+
 export const config = {
   // --------------------------------------------------------------------------
   //  CONEXAO COM A MESA
@@ -19,8 +62,8 @@ export const config = {
   //  - Para testar em casa com o SIMULADOR, use: host '127.0.0.1', porta 8001
   //  - Na igreja, troque para o IP real da mesa e porta 80.
   mesa: {
-    host: '127.0.0.1', // <-- TROCAR pelo IP da mesa na igreja (ex: '192.168.1.100')
-    port: 8001,        // <-- Na igreja normalmente e 80
+    host: '192.168.100.201', // <-- TROCAR pelo IP da mesa na igreja (ex: '192.168.1.100')
+    port: 80,        // <-- Na igreja normalmente e 80
   },
 
   // --------------------------------------------------------------------------
@@ -53,8 +96,9 @@ export const config = {
   //    - nome:   aparece na tela
   //    - senha:  login simples para o musico entrar (pode repetir se quiser)
   //    - aux:    qual saida aux (0..9) e o fone DELE
-  //    - canais: lista de ate 20 canais que ele pode controlar no fone dele.
-  //              Cada canal tem o indice na mesa (id) e um nome amigavel.
+  //    - canais: lista de canais que ele pode controlar no fone dele (sem
+  //              limite fixo). Cada canal tem o indice na mesa (id) e um
+  //              nome amigavel.
   //
   //  IMPORTANTE: os indices de canal comecam em 0.
   //    Canal 1 da mesa = id 0, Canal 2 = id 1, ... Canal 24 = id 23.
@@ -64,99 +108,29 @@ export const config = {
       id: 'baterista',
       nome: 'Baterista',
       senha: '1111',
-      aux: 0, // fone/aux do baterista
-      canais: [
-        { id: 0,  nome: 'Bumbo' },
-        { id: 1,  nome: 'Caixa' },
-        { id: 2,  nome: 'Tom 1' },
-        { id: 3,  nome: 'Tom 2' },
-        { id: 4,  nome: 'Overhead' },
-        { id: 5,  nome: 'Baixo' },
-        { id: 6,  nome: 'Guitarra' },
-        { id: 7,  nome: 'Violao' },
-        { id: 8,  nome: 'Teclado L' },
-        { id: 9,  nome: 'Teclado R' },
-        { id: 10, nome: 'Voz Principal' },
-        { id: 11, nome: 'Back Vocal 1' },
-        { id: 12, nome: 'Back Vocal 2' },
-        { id: 13, nome: 'Back Vocal 3' },
-        { id: 14, nome: 'Click' },
-        { id: 15, nome: 'Playback L' },
-        { id: 16, nome: 'Playback R' },
-        { id: 17, nome: 'Ministracao' },
-        { id: 18, nome: 'Ambiente' },
-        { id: 19, nome: 'Extra' },
-      ],
+      aux: 8, // fone BATERISTA (estereo 8+9 -> usa o indice da esquerda: 8)
+      canais: canaisTodos,
     },
     {
-      id: 'baixista',
-      nome: 'Baixista',
+      id: 'guivio',
+      nome: 'Guitarra / Violao',
       senha: '2222',
-      aux: 1,
-      canais: [
-        { id: 0,  nome: 'Bumbo' },
-        { id: 1,  nome: 'Caixa' },
-        { id: 4,  nome: 'Overhead' },
-        { id: 5,  nome: 'Baixo' },
-        { id: 6,  nome: 'Guitarra' },
-        { id: 7,  nome: 'Violao' },
-        { id: 8,  nome: 'Teclado L' },
-        { id: 9,  nome: 'Teclado R' },
-        { id: 10, nome: 'Voz Principal' },
-        { id: 11, nome: 'Back Vocal 1' },
-        { id: 12, nome: 'Back Vocal 2' },
-        { id: 13, nome: 'Back Vocal 3' },
-        { id: 14, nome: 'Click' },
-        { id: 15, nome: 'Playback L' },
-        { id: 16, nome: 'Playback R' },
-        { id: 17, nome: 'Ministracao' },
-        { id: 18, nome: 'Ambiente' },
-        { id: 19, nome: 'Extra' },
-      ],
+      aux: 5, // fone GUI/VIO (estereo 5+6 -> usa 5)
+      canais: canaisTodos,
     },
     {
-      id: 'guitarrista',
-      nome: 'Guitarrista',
+      id: 'teclado',
+      nome: 'Teclado',
       senha: '3333',
-      aux: 2,
-      canais: [
-        { id: 0,  nome: 'Bumbo' },
-        { id: 1,  nome: 'Caixa' },
-        { id: 5,  nome: 'Baixo' },
-        { id: 6,  nome: 'Guitarra' },
-        { id: 7,  nome: 'Violao' },
-        { id: 8,  nome: 'Teclado L' },
-        { id: 9,  nome: 'Teclado R' },
-        { id: 10, nome: 'Voz Principal' },
-        { id: 11, nome: 'Back Vocal 1' },
-        { id: 12, nome: 'Back Vocal 2' },
-        { id: 13, nome: 'Back Vocal 3' },
-        { id: 14, nome: 'Click' },
-        { id: 17, nome: 'Ministracao' },
-        { id: 18, nome: 'Ambiente' },
-      ],
+      aux: 2, // fone TECLADO (estereo 2+3 -> usa 2)
+      canais: canaisTodos,
     },
     {
-      id: 'tecladista',
-      nome: 'Tecladista',
+      id: 'teclado2',
+      nome: 'Teclado 2',
       senha: '4444',
-      aux: 3,
-      canais: [
-        { id: 0,  nome: 'Bumbo' },
-        { id: 1,  nome: 'Caixa' },
-        { id: 5,  nome: 'Baixo' },
-        { id: 6,  nome: 'Guitarra' },
-        { id: 7,  nome: 'Violao' },
-        { id: 8,  nome: 'Teclado L' },
-        { id: 9,  nome: 'Teclado R' },
-        { id: 10, nome: 'Voz Principal' },
-        { id: 11, nome: 'Back Vocal 1' },
-        { id: 12, nome: 'Back Vocal 2' },
-        { id: 13, nome: 'Back Vocal 3' },
-        { id: 14, nome: 'Click' },
-        { id: 17, nome: 'Ministracao' },
-        { id: 18, nome: 'Ambiente' },
-      ],
+      aux: 4, // fone TECLADO 2 (mono)
+      canais: canaisTodos,
     },
   ],
 

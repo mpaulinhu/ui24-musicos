@@ -35,6 +35,27 @@ const mesa = new Ui24Client({
   raw: true, // o simulador e muitas mesas aceitam mensagens "cruas"
 });
 
+// Mapeamento reverso "tipo:indiceNaMesa" -> id interno do canal (o "id" usado
+// no config.js e no protocolo com o app do musico). Necessario porque canais
+// especiais (ex: Line In, tipo "l") tem um indice na mesa diferente do "id"
+// que usamos internamente. Construido a partir de TODOS os musicos, entao
+// funciona mesmo que cada um customize sua propria lista de canais.
+const canalPorIndiceMesa = new Map();
+for (const m of config.musicos) {
+  for (const c of m.canais) {
+    const tipo = c.tipo || 'i';
+    const canalMesa = c.canalMesa != null ? c.canalMesa : c.id;
+    canalPorIndiceMesa.set(`${tipo}:${canalMesa}`, c.id);
+  }
+}
+// Devolve { canalMesa, tipo } para escrever/ler na mesa, a partir do "id" do config.
+function resolverCanal(canalCfg) {
+  return {
+    canalMesa: canalCfg.canalMesa != null ? canalCfg.canalMesa : canalCfg.id,
+    tipo: canalCfg.tipo || 'i',
+  };
+}
+
 let mesaConectada = false;
 
 mesa.on('status', (s) => {
@@ -73,15 +94,17 @@ function traduzirComando(msg) {
   const caminho = corpo.slice(0, idx);
   const valor = corpo.slice(idx + 1);
 
-  // Canal dentro de um aux (fone): i.<canal>.aux.<aux>.value|mix
-  let m = /^i\.(\d+)\.aux\.(\d+)\.(value|mix)$/.exec(caminho);
+  // Canal dentro de um aux (fone): i.<canal>.aux.<aux>.value|mute (entrada
+  // normal) ou l.<canal>.aux.<aux>.value|mute (Line In, canais dedicados).
+  let m = /^(i|l)\.(\d+)\.aux\.(\d+)\.(value|mute)$/.exec(caminho);
   if (m) {
-    const canal = Number(m[1]), aux = Number(m[2]), campo = m[3];
-    const pct = campo === 'value' ? ` = ${Math.round(Number(valor) * 100)}%` : ` = ${valor}`;
-    return `Canal ${canal} (mesa: canal ${canal + 1})  no  Aux ${aux} (mesa: fone ${aux + 1})  [${campo}]${pct}`;
+    const tipo = m[1], canal = Number(m[2]), aux = Number(m[3]), campo = m[4];
+    const pct = campo === 'value' ? ` = ${Math.round(Number(valor) * 100)}%` : (Number(valor) === 0 ? ' = ligado' : ' = MUTADO');
+    const rotuloCanal = tipo === 'l' ? `Line In ${canal === 0 ? 'L' : 'R'}` : `Canal ${canal} (mesa: canal ${canal + 1})`;
+    return `${rotuloCanal}  no  Aux ${aux} (mesa: fone ${aux + 1})  [${campo}]${pct}`;
   }
-  // Master do aux: a.<aux>.value
-  m = /^a\.(\d+)\.value$/.exec(caminho);
+  // Master do aux (volume geral do fone): a.<aux>.mix
+  m = /^a\.(\d+)\.mix$/.exec(caminho);
   if (m) {
     const aux = Number(m[1]);
     return `Volume geral do Aux ${aux} (mesa: fone ${aux + 1}) = ${Math.round(Number(valor) * 100)}%`;
@@ -94,28 +117,52 @@ function traduzirComando(msg) {
 // que se importam com aquele canal/aux.
 mesa.on('parametro', ({ caminho, valor }) => {
   const info = parseCaminho(caminho);
-  if (!info) return;
-  // Envia so para clientes cujo musico usa esse aux.
-  for (const cli of clientes) {
-    if (cli.tipo === 'musico' && cli.musico && cli.musico.aux === info.aux) {
-      enviar(cli.ws, {
-        tipo: 'parametro',
-        canal: info.canal,
-        aux: info.aux,
-        campo: info.campo, // 'value' ou 'mix'
-        valor,
-      });
+  if (info) {
+    // Traduz o indice-na-mesa (+ tipo) de volta para o "id" interno do canal
+    // (o mesmo que o app conhece). Canais que nenhum musico usa nao tem
+    // entrada nesse mapa — ignoramos (nao ha para quem repassar).
+    const canalId = canalPorIndiceMesa.get(`${info.tipo}:${info.canalMesa}`);
+    if (canalId == null) return;
+    // O protocolo da mesa usa "mute" (1=mutado); o app fala em "mix"
+    // (1=ligado/ouvindo) — invertemos aqui para o app nao precisar saber
+    // do detalhe do protocolo.
+    const valorParaApp = info.campo === 'mute' ? (Number(valor) === 0 ? 1 : 0) : valor;
+    const campoParaApp = info.campo === 'mute' ? 'mix' : info.campo;
+    // Envia so para clientes cujo musico usa esse aux.
+    for (const cli of clientes) {
+      if (cli.tipo === 'musico' && cli.musico && cli.musico.aux === info.aux) {
+        enviar(cli.ws, {
+          tipo: 'parametro',
+          canal: canalId,
+          aux: info.aux,
+          campo: campoParaApp, // 'value' ou 'mix'
+          valor: valorParaApp,
+        });
+      }
+    }
+    return;
+  }
+  // Master do fone (volume geral): a.<aux>.mix
+  const m = /^a\.(\d+)\.mix$/.exec(caminho);
+  if (m) {
+    const aux = Number(m[1]);
+    for (const cli of clientes) {
+      if (cli.tipo === 'musico' && cli.musico && cli.musico.aux === aux) {
+        enviar(cli.ws, { tipo: 'master', aux, valor });
+      }
     }
   }
 });
 
 mesa.conectar();
 
-// Extrai canal/aux/campo de um caminho tipo "i.5.aux.0.value"
+// Extrai tipo/canal(na mesa)/aux/campo de um caminho tipo "i.5.aux.0.value"
+// ou "l.0.aux.8.mute" (Line In). Aceita os prefixos "i" (entrada normal) e
+// "l" (Line In estereo).
 function parseCaminho(caminho) {
-  const m = /^i\.(\d+)\.aux\.(\d+)\.(value|mix)$/.exec(caminho);
+  const m = /^(i|l)\.(\d+)\.aux\.(\d+)\.(value|mute)$/.exec(caminho);
   if (!m) return null;
-  return { canal: Number(m[1]), aux: Number(m[2]), campo: m[3] };
+  return { tipo: m[1], canalMesa: Number(m[2]), aux: Number(m[3]), campo: m[4] };
 }
 
 // ---------------------------------------------------------------------------
@@ -276,7 +323,9 @@ function tratarMensagem(cli, msg) {
     // ----- MUSICO ALTERA NIVEL DE UM CANAL NO FONE DELE -----
     case 'set_nivel': {
       if (!podeMexer(cli, msg.canal)) return;
-      const r = mesa.setNivelCanalAux(msg.canal, cli.musico.aux, msg.valor);
+      const canalCfg = cli.musico.canais.find((c) => c.id === msg.canal);
+      const { canalMesa, tipo } = resolverCanal(canalCfg);
+      const r = mesa.setNivelCanalAux(canalMesa, cli.musico.aux, msg.valor, tipo);
       // Ecoa de volta para o proprio musico confirmar (a mesa tambem ecoa)
       enviar(cli.ws, { tipo: 'parametro', canal: msg.canal, aux: cli.musico.aux, campo: 'value', valor: r.valor });
       break;
@@ -285,7 +334,9 @@ function tratarMensagem(cli, msg) {
     // ----- MUSICO MUTA/DESMUTA UM CANAL NO FONE DELE -----
     case 'set_mix': {
       if (!podeMexer(cli, msg.canal)) return;
-      const r = mesa.setMixCanalAux(msg.canal, cli.musico.aux, !!msg.ligado);
+      const canalCfg = cli.musico.canais.find((c) => c.id === msg.canal);
+      const { canalMesa, tipo } = resolverCanal(canalCfg);
+      const r = mesa.setMixCanalAux(canalMesa, cli.musico.aux, !!msg.ligado, tipo);
       enviar(cli.ws, { tipo: 'parametro', canal: msg.canal, aux: cli.musico.aux, campo: 'mix', valor: r.valor });
       break;
     }
@@ -348,14 +399,18 @@ function podeMexer(cli, canal) {
 function enviarEstadoInicial(cli) {
   const aux = cli.musico.aux;
   for (const c of cli.musico.canais) {
-    const nivel = mesa.getEstado(mesa.caminhoNivel(c.id, aux));
-    const mix = mesa.getEstado(mesa.caminhoMix(c.id, aux));
+    const { canalMesa, tipo } = resolverCanal(c);
+    const nivel = mesa.getEstado(mesa.caminhoNivel(canalMesa, aux, tipo));
+    // mesa.caminhoMix() aponta para o campo real "mute" (1=mutado); o app
+    // fala em "mix" (1=ligado) — invertemos aqui, igual no repasse ao vivo.
+    const mute = mesa.getEstado(mesa.caminhoMix(canalMesa, aux, tipo));
+    const mix = mute == null ? 1 : (Number(mute) === 0 ? 1 : 0);
     enviar(cli.ws, {
       tipo: 'estado_canal',
       canal: c.id,
       aux,
       nivel: nivel == null ? 0.5 : nivel,
-      mix: mix == null ? 1 : mix,
+      mix,
     });
   }
   const master = mesa.getEstado(mesa.caminhoMasterAux(aux));
