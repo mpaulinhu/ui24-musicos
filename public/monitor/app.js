@@ -16,6 +16,22 @@ const URGENTES = ['microfonia', 'apito', 'urgente', 'parou', 'sem som', 'caiu', 
 // Guarda a senha do ultimo login para refazer sozinho se cair a conexao.
 let ultimaSenha = null;
 
+// Login lembrado (localStorage) — essa tela costuma ficar num monitor fixo,
+// abrindo sozinha ao ligar o PC, entao vale lembrar a senha por bastante
+// tempo (evita ter que digitar toda vez que reinicia).
+const CHAVE_LOGIN_SALVO = 'mixdefone_monitor_login';
+const DURACAO_LOGIN_MS = 90 * 24 * 60 * 60 * 1000; // 90 dias
+function salvarLogin(senha) {
+  localStorage.setItem(CHAVE_LOGIN_SALVO, JSON.stringify({ senha, expira: Date.now() + DURACAO_LOGIN_MS }));
+}
+function lerLoginSalvo() {
+  try {
+    const { senha, expira } = JSON.parse(localStorage.getItem(CHAVE_LOGIN_SALVO));
+    return (senha && expira && Date.now() <= expira) ? senha : null;
+  } catch { return null; }
+}
+function esquecerLogin() { localStorage.removeItem(CHAVE_LOGIN_SALVO); }
+
 function conectar() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   ws = new WebSocket(`${proto}://${location.host}`);
@@ -35,11 +51,13 @@ function tratar(msg) {
   switch (msg.tipo) {
     case 'login_ok':
       autenticado = true;
+      if (ultimaSenha) salvarLogin(ultimaSenha);
       $('#tela-login').classList.remove('ativa');
       $('#tela-monitor').classList.add('ativa');
       break;
     case 'login_falhou':
       ultimaSenha = null; // evita loop de login com senha errada
+      esquecerLogin();
       $('#login-erro').textContent = msg.motivo || 'Senha invalida';
       break;
     case 'chat':
@@ -72,12 +90,16 @@ function mostrarMensagem(msg) {
 
   const div = document.createElement('div');
   div.className = 'cartao' + (ehHouse ? ' housemix' : '') + (urgente ? ' urgente' : '');
+  let midia = '';
+  if (msg.imagem) midia += `<img class="msg-imagem" src="${msg.imagem}" alt="foto" />`;
+  if (msg.audio) midia += `<audio class="msg-audio" src="${msg.audio}" controls></audio>`;
   div.innerHTML = `
     <div class="cab">
       <span class="autor">${escapar(msg.de)}</span>
       <span class="hora">${horaAgora()}</span>
     </div>
-    <div class="texto">${escapar(msg.texto)}</div>
+    ${msg.texto ? `<div class="texto">${escapar(msg.texto)}</div>` : ''}
+    ${midia}
   `;
   cont.appendChild(div);
   cont.scrollTop = cont.scrollHeight;
@@ -93,7 +115,19 @@ function mostrarPresenca(lista) {
   for (const p of lista) {
     const chip = document.createElement('span');
     chip.className = 'chip';
-    chip.textContent = `${p.nome} (fone ${p.aux + 1})`;
+    chip.innerHTML = `<span class="chip-nome">${escapar(p.nome)} (fone ${p.aux + 1})</span>`;
+
+    const sino = document.createElement('button');
+    sino.className = 'chip-sino';
+    sino.title = `Chamar atenção de ${p.nome} (vibra o celular dele)`;
+    sino.textContent = '🔔';
+    sino.addEventListener('click', () => {
+      enviar({ tipo: 'chamar_atencao', musicoId: p.id });
+      sino.classList.add('tocado');
+      setTimeout(() => sino.classList.remove('tocado'), 600);
+    });
+    chip.appendChild(sino);
+
     el.appendChild(chip);
   }
 }
@@ -145,4 +179,5 @@ function escapar(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+ultimaSenha = lerLoginSalvo(); // entra sozinho se ja tiver logado antes (ate expirar)
 conectar();

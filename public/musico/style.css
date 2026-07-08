@@ -85,6 +85,16 @@ html, body {
 }
 .link-instalar.oculto { display: none; }
 
+/* aviso temporario (toast) — nao bloqueia a tela, some sozinho */
+.aviso-toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+  max-width: min(90vw, 380px); padding: 12px 18px; border-radius: 10px;
+  background: #23252c; color: var(--texto-claro); font-size: 13px; line-height: 1.4;
+  text-align: center; box-shadow: 0 6px 20px rgba(0,0,0,.5); border: 1px solid #3a3d44;
+  z-index: 1000; pointer-events: none;
+}
+.aviso-toast.oculto { display: none; }
+
 /* -------------------- CONSOLE (tela principal) -------------------- */
 #tela-mixer { padding: 0; }
 .console {
@@ -238,6 +248,56 @@ html, body {
 }
 .btn-on .led-btn { width: 7px; height: 7px; border-radius: 50%; }
 
+/* Cabecalho "CANAIS · N / deslize ->", so aparece no modo retrato (ver media
+   query abaixo) — no resto (paisagem/desktop) fica escondido. */
+.canais-cab { display: none; }
+
+/* -------------------- MODO RETRATO (celular em pe) --------------------
+   Grade de 2 linhas (em vez de 1 linha so), com cada canal em um "card"
+   proprio — baseado na referencia visual que o usuario passou. So se aplica
+   quando o celular esta na vertical; paisagem continua com o layout normal. */
+@media (orientation: portrait) {
+  /* MASTER: o texto "MASTER" tinha largura minima fixa demais, sobrando
+     pouco espaco pro slider numa tela estreita — libera espaco e deixa a
+     barra maior/mais facil de ver e arrastar. */
+  .master { padding: 12px 16px; gap: 12px; }
+  .master-info { min-width: 0; flex-shrink: 0; }
+  .master-sub { display: none; }
+  .master-track { height: 36px; }
+  .master-trilho, .master-fill { height: 12px; }
+  .master-cap { width: 26px; height: 36px; }
+  .master-valor { font-size: 18px; }
+
+  .canais-cab {
+    display: flex; align-items: center; justify-content: space-between;
+    margin: 0 2px 8px;
+  }
+  .canais-titulo {
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600;
+    letter-spacing: 1.5px; color: var(--texto-mono);
+  }
+  .canais-dica {
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #54545c;
+  }
+
+  .faders {
+    display: grid; grid-template-rows: repeat(2, auto); grid-auto-flow: column;
+    grid-auto-columns: 104px; gap: 9px; overflow-x: auto; overflow-y: hidden;
+  }
+  .canal {
+    scroll-snap-align: start; width: 104px; flex: none;
+    background: #14141a; border-radius: 14px; border: 1px solid rgba(255,255,255,.06);
+    box-shadow: none;
+  }
+  .canal-band { display: none; } /* o fundo do card ja identifica o canal */
+  .canal-cab { padding: 9px 6px 4px; }
+  .canal-corpo { min-height: 132px; padding: 6px 4px 4px; }
+  .escala { display: none; } /* simplifica: sem a escala de dB no retrato */
+  .fader { width: 30px; }
+  .fader-cap { width: 34px; height: 20px; }
+  .vu { width: 6px; }
+}
+
 /* -------------------- GERAL (mute geral) -------------------- */
 #painel-geral { display: none; }
 #painel-geral.ativo { display: flex; flex-direction: column; gap: 16px; }
@@ -279,7 +339,7 @@ html, body {
   border: 1px solid var(--borda);
 }
 .chat-mensagens {
-  flex: 1; min-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;
+  height: 45vh; max-height: 360px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;
   padding: 14px; background: linear-gradient(180deg,#141519,#0f1014);
   border: 1px solid var(--borda); border-radius: 10px; box-shadow: inset 0 1px 3px rgba(0,0,0,.5);
 }
@@ -287,6 +347,8 @@ html, body {
 .msg .autor { display: block; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 1px; opacity: .75; margin-bottom: 3px; }
 .msg.minha { align-self: flex-end; background: linear-gradient(180deg,#2b62d6,#2450b8); color: #fff; }
 .msg.deles { align-self: flex-start; background: #1c1e25; border: 1px solid #2a2c33; }
+.msg-imagem { display: block; max-width: 100%; max-height: 220px; border-radius: 8px; margin-top: 4px; }
+.msg-audio { display: block; width: 100%; max-width: 240px; margin-top: 4px; height: 32px; }
 
 .chat-rapidas { display: flex; flex-wrap: wrap; gap: 8px; }
 .rapida {
@@ -295,17 +357,51 @@ html, body {
 }
 .rapida:active { background: #2b62d6; border-color: #2b62d6; color: #fff; }
 
-.chat-envio { display: flex; gap: 8px; }
-.chat-envio input {
-  flex: 1; padding: 13px 15px; font-size: 15px; font-family: inherit;
-  background: #0d0e12; color: var(--texto-claro); border: 1px solid #23252c; border-radius: 8px; outline: none;
+.chat-envio { display: flex; gap: 8px; align-items: center; }
+
+/* botao redondo, minimalista (so o icone, sem texto) — foto e cancelar */
+.btn-midia {
+  flex: none; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
+  background: transparent; color: var(--texto-mono); border: none; border-radius: 50%;
+  cursor: pointer; transition: all .15s;
 }
-.chat-envio input:focus { border-color: #3a5bd0; }
-.btn-enviar {
-  padding: 13px 20px; font-size: 13px; font-weight: 600; letter-spacing: 1px; color: #fff;
-  background: linear-gradient(180deg,#2b62d6,#2450b8); border: none; border-radius: 8px; cursor: pointer;
+.btn-midia:active { background: #1c1e25; color: var(--texto-claro); }
+
+/* input de arquivo (foto): fica "invisivel" mas NAO com display:none — em
+   varios navegadores de celular, disparar .click() num input com
+   display:none nao abre a camera/galeria. Esse jeito (fora da tela, mas
+   presente no layout) funciona em todos. */
+.arquivo-sr {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
 }
-.btn-enviar:active { filter: brightness(.9); }
+
+.chat-campo-wrap { position: relative; flex: 1; }
+#chat-input {
+  width: 100%; padding: 12px 14px; font-size: 15px; font-family: inherit;
+  background: #0d0e12; color: var(--texto-claro); border: 1px solid #23252c; border-radius: 999px; outline: none;
+}
+#chat-input:focus { border-color: #3a5bd0; }
+
+/* indicador de gravacao — cobre o campo de texto enquanto grava (igual WhatsApp) */
+.gravando-indicador {
+  position: absolute; inset: 0; display: flex; align-items: center; gap: 9px; padding: 0 14px;
+  background: #0d0e12; border: 1px solid #7a1f1f; border-radius: 999px;
+  font-family: 'IBM Plex Mono', monospace; font-size: 13px;
+}
+.ponto-rec { flex: none; width: 9px; height: 9px; border-radius: 50%; background: #e5484d; animation: gravandoPulse 1s ease-in-out infinite; }
+@keyframes gravandoPulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+#gravando-tempo { flex: none; font-weight: 600; color: var(--texto-claro); }
+.gravando-dica { color: var(--texto-mono); font-size: 11px; margin-left: auto; }
+
+/* botao de acao: mic (parado) <-> enviar (quando tem texto) — sempre em
+   destaque (cor do app), igual o botao verde do WhatsApp. */
+.btn-acao {
+  flex: none; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
+  background: var(--amarelo); color: #14151a; border: none; border-radius: 50%; cursor: pointer; transition: all .15s;
+}
+.btn-acao:active { filter: brightness(.9); }
+.btn-acao.gravando { background: #e5484d; color: #fff; animation: gravandoPulse 1s ease-in-out infinite; }
 
 /* -------------------- MODO COMPACTO (celular deitado / pouca altura) --------------------
    Quando a tela e' baixa (celular em paisagem), reduz tudo para caber mais
@@ -345,4 +441,25 @@ html, body {
   .canal-valor { font-size: 10px; padding: 1px 2px; }
   .btn-on { margin: 3px 4px 5px; padding: 4px 0; font-size: 9px; gap: 4px; }
   .btn-on .led-btn { width: 5px; height: 5px; }
+
+  /* GERAL: 5 botoes empilhados cabiam mal numa tela baixa — encolhe. */
+  #painel-geral.ativo { gap: 8px; }
+  .geral-aviso { padding: 8px 10px; font-size: 11px; line-height: 1.3; }
+  .geral-botoes { gap: 6px; }
+  .btn-geral { padding: 8px 12px; }
+  .btn-geral .geral-nome { font-size: 13px; }
+  .btn-geral .geral-status { font-size: 10px; padding: 4px 10px; }
+
+  /* CHAT: a caixa de mensagens tinha altura minima enorme (300px) que
+     empurrava o campo de escrever pra fora da tela — o principal motivo
+     de ter que rolar demais. Agora o log fica pequeno e o campo de
+     escrever fica sempre visivel, sem precisar rolar. */
+  #painel-chat.ativo { gap: 6px; min-height: 0; }
+  .chat-info { padding: 6px 10px; font-size: 9px; }
+  .chat-mensagens { min-height: 80px; max-height: 150px; padding: 8px; gap: 5px; }
+  .msg { padding: 6px 10px; font-size: 12px; }
+  .chat-rapidas { gap: 5px; }
+  .rapida { padding: 5px 9px; font-size: 10px; }
+  #chat-input { padding: 8px 12px; font-size: 13px; }
+  .btn-midia, .btn-acao { width: 34px; height: 34px; }
 }

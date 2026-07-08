@@ -7,6 +7,17 @@
 
 const $ = (sel) => document.querySelector(sel);
 
+// Aviso temporario (toast) — nunca usar alert() aqui: em celular, alert()
+// trava o toque em andamento e pode ate reabrir sozinho num "segurar" longo.
+let _timerAviso = null;
+function mostrarAviso(texto) {
+  const el = $('#aviso-toast');
+  el.textContent = texto;
+  el.classList.remove('oculto');
+  clearTimeout(_timerAviso);
+  _timerAviso = setTimeout(() => el.classList.add('oculto'), 3500);
+}
+
 // PWA: registra o service worker (permite "instalar" na tela inicial).
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/musico/sw.js').catch(() => {});
@@ -192,7 +203,40 @@ function tratar(msg) {
       break;
     case 'mute_geral': desenharMuteGeral(msg.canal, msg.mutado); break;
     case 'chat': receberChat(msg); break;
+    case 'chamar_atencao': chamarAtencao(); break;
   }
+}
+
+// ---------------------------------------------------------------------------
+//  A house mix quer chamar a atencao deste musico especifico (mensagem
+//  urgente): vibra o celular (se o navegador suportar) e toca um som
+//  insistente, alem de um aviso na tela. Nao depende de o musico estar na
+//  aba do chat.
+// ---------------------------------------------------------------------------
+let _audioCtxAlerta = null;
+function chamarAtencao() {
+  if (navigator.vibrate) navigator.vibrate([300, 120, 300, 120, 300]);
+  tocarAlertaSonoro();
+  mostrarAviso('🔔 A house mix está chamando sua atenção!');
+}
+function tocarAlertaSonoro() {
+  try {
+    _audioCtxAlerta = _audioCtxAlerta || new (window.AudioContext || window.webkitAudioContext)();
+    if (_audioCtxAlerta.state === 'suspended') _audioCtxAlerta.resume();
+    const agora = _audioCtxAlerta.currentTime;
+    [0, 0.35, 0.7].forEach((atraso) => {
+      const osc = _audioCtxAlerta.createOscillator();
+      const gain = _audioCtxAlerta.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.0001, agora + atraso);
+      gain.gain.exponentialRampToValueAtTime(0.3, agora + atraso + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, agora + atraso + 0.28);
+      osc.connect(gain).connect(_audioCtxAlerta.destination);
+      osc.start(agora + atraso);
+      osc.stop(agora + atraso + 0.3);
+    });
+  } catch { /* alguns navegadores exigem interacao antes de tocar audio */ }
 }
 
 // ---------------------------------------------------------------------------
@@ -264,6 +308,7 @@ function entrarNoMixer() {
   const cont = $('#faders');
   cont.innerHTML = '';
   musico.canais.forEach((canal, i) => cont.appendChild(criarCanal(canal, i)));
+  $('#canais-contagem').textContent = musico.canais.length;
 }
 
 function criarCanal(canal, indice) {
@@ -593,8 +638,8 @@ function enviarChat(texto) {
   if (!t) return;
   enviar({ tipo: 'chat', texto: t });
   $('#chat-input').value = '';
+  $('#chat-input').dispatchEvent(new Event('input')); // volta o botao de acao pro icone de mic
 }
-$('#chat-enviar').addEventListener('click', () => enviarChat($('#chat-input').value));
 $('#chat-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') enviarChat($('#chat-input').value); });
 document.querySelectorAll('.rapida').forEach((b) => b.addEventListener('click', () => enviarChat(b.dataset.msg)));
 
@@ -603,7 +648,11 @@ function receberChat(msg) {
   const div = document.createElement('div');
   const minha = msg.de === (musico && musico.nome);
   div.className = 'msg ' + (minha ? 'minha' : 'deles');
-  div.innerHTML = `<span class="autor">${escapar(msg.de)}</span>${escapar(msg.texto)}`;
+  let html = `<span class="autor">${escapar(msg.de)}</span>`;
+  if (msg.texto) html += escapar(msg.texto);
+  if (msg.imagem) html += `<img class="msg-imagem" src="${msg.imagem}" alt="foto" />`;
+  if (msg.audio) html += `<audio class="msg-audio" src="${msg.audio}" controls></audio>`;
+  div.innerHTML = html;
   cont.appendChild(div);
   cont.scrollTop = cont.scrollHeight;
   if (abaAtual !== 'chat' && !minha && !recebendoHistorico) {
@@ -614,6 +663,51 @@ function receberChat(msg) {
   }
 }
 function zerarNaoLidas() { naoLidas = 0; $('#chat-badge').classList.add('oculto'); }
+
+// ---------------------------------------------------------------------------
+//  CHAT: FOTO — tira/escolhe foto, comprime (senao fica pesado demais para
+//  mandar por WebSocket) e envia. Nao fica salvo em nenhum arquivo/banco: so
+//  trafega como texto base64 e vive na memoria do servidor ate ele reiniciar.
+// ---------------------------------------------------------------------------
+$('#btn-foto').addEventListener('click', () => $('#input-foto').click());
+$('#input-foto').addEventListener('change', async (e) => {
+  const arquivo = e.target.files[0];
+  e.target.value = '';
+  if (!arquivo) return;
+  try {
+    const dataUri = await comprimirImagem(arquivo, 900, 0.7);
+    enviar({ tipo: 'chat', imagem: dataUri });
+  } catch {
+    mostrarAviso('Não consegui processar essa foto. Tenta outra.');
+  }
+});
+
+function comprimirImagem(arquivo, ladoMaximo, qualidade) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > height && width > ladoMaximo) { height = Math.round(height * ladoMaximo / width); width = ladoMaximo; }
+      else if (height > ladoMaximo) { width = Math.round(width * ladoMaximo / height); height = ladoMaximo; }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', qualidade));
+      URL.revokeObjectURL(img.src);
+    };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(arquivo);
+  });
+}
+
+// ---------------------------------------------------------------------------
+//  CHAT: botao de ENVIAR (texto). A gravacao de audio foi removida — dependia
+//  de https + microfone (getUserMedia) de um jeito que o acesso por IP nao
+//  suporta, e ficava travando a tela. Foto e texto continuam funcionando.
+// ---------------------------------------------------------------------------
+(function ligarEnvioChat() {
+  $('#btn-acao').addEventListener('click', () => enviarChat($('#chat-input').value));
+})();
 
 // ---------------------------------------------------------------------------
 //  helpers

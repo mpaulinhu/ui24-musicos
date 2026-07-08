@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/musico/style.css" />
+  <link rel="stylesheet" href="/musico/style.css?v=5" />
 </head>
 <body>
   <!-- ===================== TELA DE LOGIN ===================== -->
@@ -45,6 +45,9 @@
       <p id="dica-instalar" class="link-instalar oculto">📲 Toque em compartilhar e "Adicionar à Tela de Início"</p>
     </div>
   </section>
+
+  <!-- Aviso temporario (nao-bloqueante) — some sozinho, sem precisar de OK -->
+  <div id="aviso-toast" class="aviso-toast oculto"></div>
 
   <!-- ===================== TELA PRINCIPAL ===================== -->
   <section id="tela-mixer" class="tela">
@@ -89,6 +92,10 @@
           <span id="master-valor" class="master-valor">75%</span>
         </div>
 
+        <div class="canais-cab">
+          <span class="canais-titulo">CANAIS · <span id="canais-contagem">0</span></span>
+          <span class="canais-dica">deslize →</span>
+        </div>
         <div id="faders" class="faders"><!-- gerado por JS --></div>
       </div>
 
@@ -109,13 +116,23 @@
           <button class="rapida" data-msg="Esta com microfonia!">microfonia!</button>
         </div>
         <div class="chat-envio">
-          <input id="chat-input" type="text" placeholder="Escreva uma mensagem…" maxlength="300" />
-          <button id="chat-enviar" class="btn-enviar">ENVIAR</button>
+          <button id="btn-foto" class="btn-midia" title="Enviar foto">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3.2l1.3-2h6.9l1.3 2H20a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="14" r="3.3"/></svg>
+          </button>
+          <input id="input-foto" type="file" accept="image/*" capture="environment" class="arquivo-sr" />
+
+          <div class="chat-campo-wrap">
+            <input id="chat-input" type="text" placeholder="Escreva uma mensagem…" maxlength="300" />
+          </div>
+
+          <button id="btn-acao" class="btn-acao" title="Enviar mensagem">
+            <svg class="icone-enviar" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3.4 20.6l17.9-8.6-17.9-8.6v6.7l11.5 1.9-11.5 1.9z"/></svg>
+          </button>
         </div>
       </div>
     </div>
   </section>
 
-  <script src="/musico/app.js"></script>
+  <script src="/musico/app.js?v=5"></script>
 </body>
 </html>

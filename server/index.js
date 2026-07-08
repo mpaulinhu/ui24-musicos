@@ -268,14 +268,19 @@ function configPublica() {
 // ---------------------------------------------------------------------------
 //  3) WebSocket (musicos e house mix conectam aqui)
 // ---------------------------------------------------------------------------
-const wss = new WebSocketServer({ server: httpServer });
+// maxPayload maior que o padrao: o chat aceita foto/audio (base64), que pesam
+// mais que uma mensagem de texto normal.
+const wss = new WebSocketServer({ server: httpServer, maxPayload: 8 * 1024 * 1024 });
 
 // Lista de clientes conectados
 const clientes = new Set();
 
-// Historico curto do chat (para quem entra depois ver as ultimas)
+// Historico curto do chat (para quem entra depois ver as ultimas). So em
+// memoria (nunca grava em disco/banco) — some sozinho quando o servidor
+// reinicia, de proposito (fotos/audios sao so para o culto do dia).
 const historicoChat = [];
 const MAX_HISTORICO = 200; // chat geral do culto: guarda bastante mensagem
+const LIMITE_MIDIA = 3 * 1024 * 1024; // ~3MB de base64 por foto/audio (ja compactado no celular)
 
 wss.on('connection', (ws) => {
   const cli = { ws, tipo: null, musico: null, nome: null, autenticado: false };
@@ -405,10 +410,14 @@ function tratarMensagem(cli, msg) {
     // ----- CHAT: musico manda mensagem para a house mix -----
     case 'chat': {
       if (!cli.autenticado) return;
+      const midia = extrairMidia(msg);
+      const texto = String(msg.texto || '').slice(0, 300);
+      if (!texto && !midia.imagem && !midia.audio) return; // nada para mandar
       const item = {
         de: cli.nome || 'Anonimo',
         papel: cli.tipo,
-        texto: String(msg.texto || '').slice(0, 300),
+        texto,
+        ...midia,
         // horario e preenchido no monitor (evitamos depender do relogio aqui)
         id: proximoIdChat(),
       };
@@ -422,13 +431,24 @@ function tratarMensagem(cli, msg) {
       break;
     }
 
+    // ----- HOUSE MIX chama a atencao de UM musico especifico (vibra/apita o celular dele) -----
+    case 'chamar_atencao': {
+      if (cli.tipo !== 'housemix' || !cli.autenticado) return;
+      transmitirParaMusico(msg.musicoId, { tipo: 'chamar_atencao' });
+      break;
+    }
+
     // ----- HOUSE MIX responde no chat (opcional) -----
     case 'chat_resposta': {
       if (cli.tipo !== 'housemix') return;
+      const midia = extrairMidia(msg);
+      const texto = String(msg.texto || '').slice(0, 300);
+      if (!texto && !midia.imagem && !midia.audio) return;
       const item = {
         de: 'House Mix',
         papel: 'housemix',
-        texto: String(msg.texto || '').slice(0, 300),
+        texto,
+        ...midia,
         id: proximoIdChat(),
       };
       historicoChat.push(item);
@@ -461,6 +481,14 @@ function transmitirParaAux(aux, obj) {
 function transmitirParaTodosMusicos(obj) {
   for (const c of clientes) {
     if (c.tipo === 'musico' && c.autenticado) enviar(c.ws, obj);
+  }
+}
+
+// Envia para TODOS os dispositivos logados como ESSE musico especifico (por id
+// do config, ex: "baterista") — usado pelo botao de "chamar atencao".
+function transmitirParaMusico(musicoId, obj) {
+  for (const c of clientes) {
+    if (c.tipo === 'musico' && c.musico && c.musico.id === musicoId) enviar(c.ws, obj);
   }
 }
 
@@ -503,6 +531,17 @@ function proximoIdChat() {
   return _idChat++;
 }
 
+// Valida foto/audio do chat (vem como data URI base64). So aceita o que
+// realmente parece imagem/audio, dentro do limite de tamanho — o resto e
+// descartado silenciosamente (evita guardar lixo/abuso na memoria).
+function extrairMidia(msg) {
+  let imagem = typeof msg.imagem === 'string' ? msg.imagem : null;
+  let audio = typeof msg.audio === 'string' ? msg.audio : null;
+  if (imagem && (!imagem.startsWith('data:image/') || imagem.length > LIMITE_MIDIA)) imagem = null;
+  if (audio && (!audio.startsWith('data:audio/') || audio.length > LIMITE_MIDIA)) audio = null;
+  return { imagem, audio };
+}
+
 function enviar(ws, obj) {
   if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(obj));
 }
@@ -516,7 +555,7 @@ function transmitirPresenca() {
   const online = [];
   for (const c of clientes) {
     if (c.tipo === 'musico' && c.autenticado) {
-      online.push({ nome: c.nome, aux: c.musico.aux });
+      online.push({ id: c.musico.id, nome: c.nome, aux: c.musico.aux });
     }
   }
   for (const c of clientes) {

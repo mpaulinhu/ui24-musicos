@@ -95,6 +95,15 @@ html, body {
   background: linear-gradient(180deg,#10231a,#0c1811); border: 1px solid #1f7a45;
 }
 .lista-presenca .chip::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--verde-led); box-shadow: 0 0 6px var(--verde-led); }
+.chip-sino {
+  flex: none; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
+  padding: 0; font-size: 13px; line-height: 1; background: rgba(255,255,255,.06); border: none; border-radius: 50%;
+  cursor: pointer; transition: transform .12s, background .12s; filter: grayscale(.4);
+}
+.chip-sino:hover { background: rgba(255,255,255,.14); filter: none; }
+.chip-sino.tocado { transform: scale(1.3); filter: none; }
+@keyframes sinoTocado { 0%,100% { transform: scale(1); } 30% { transform: scale(1.35) rotate(-15deg); } 60% { transform: scale(1.35) rotate(15deg); } }
+.chip-sino.tocado { animation: sinoTocado .5s ease-in-out; }
 .lista-presenca .ninguem { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--texto-mono); }
 
 .btn-limpar {
@@ -122,6 +131,8 @@ html, body {
 .cartao.housemix .autor { color: var(--amarelo); }
 .cartao .hora { font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--texto-mono); }
 .cartao .texto { font-size: 26px; line-height: 1.35; color: #eef1f6; }
+.msg-imagem { display: block; max-width: 100%; max-height: 360px; border-radius: 10px; margin-top: 10px; }
+.msg-audio { display: block; width: 100%; max-width: 420px; margin-top: 10px; }
 
 /* rodape */
 .resposta {
