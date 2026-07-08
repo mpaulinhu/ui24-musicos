@@ -2,3 +2,13 @@ node_modules/
 npm-debug.log*
 *.log
 .DS_Store
+
+# Certificados/chaves do Tailscale (gerados localmente, nunca versionar)
+*.crt
+*.key
+
+# Scripts de diagnostico temporarios
+_*.mjs
+
+# Referencia pessoal, nao faz parte do app
+Working/

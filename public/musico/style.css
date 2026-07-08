@@ -78,6 +78,13 @@ html, body {
 .status-mesa { margin-top: 16px; font-family: 'IBM Plex Mono', monospace; font-size: 11px;
   color: var(--texto-mono); text-align: center; }
 
+.link-instalar {
+  display: block; width: 100%; margin-top: 10px; padding: 8px; text-align: center;
+  background: none; border: none; font-size: 11px; color: #5a6ad0; cursor: pointer;
+  font-family: inherit;
+}
+.link-instalar.oculto { display: none; }
+
 /* -------------------- CONSOLE (tela principal) -------------------- */
 #tela-mixer { padding: 0; }
 .console {
@@ -110,6 +117,14 @@ html, body {
 .badge-mesa.off { background: linear-gradient(180deg,#231010,#180c0c); border: 1px solid #7a1f1f; }
 .badge-mesa.off .led { background: #e5484d; }
 .badge-mesa.off .txt { color: #e5484d; }
+
+.topo-acoes { display: flex; align-items: center; gap: 10px; }
+.btn-trocar {
+  padding: 8px 13px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600;
+  letter-spacing: 1.5px; color: var(--texto-mono); background: #14151a; border: 1px solid #2a2c33;
+  border-radius: 999px; cursor: pointer; transition: all .15s;
+}
+.btn-trocar:active { background: #2a2c33; color: var(--texto-claro); }
 
 /* abas */
 .abas {
@@ -223,6 +238,37 @@ html, body {
 }
 .btn-on .led-btn { width: 7px; height: 7px; border-radius: 50%; }
 
+/* -------------------- GERAL (mute geral) -------------------- */
+#painel-geral { display: none; }
+#painel-geral.ativo { display: flex; flex-direction: column; gap: 16px; }
+.geral-aviso {
+  padding: 14px 16px; border-radius: 10px; font-size: 13px; line-height: 1.5;
+  color: var(--texto); background: linear-gradient(180deg,#1a1c22,#121319);
+  border: 1px solid var(--borda);
+}
+.geral-aviso strong { color: #e5484d; }
+
+.geral-botoes { display: flex; flex-direction: column; gap: 10px; }
+.btn-geral {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 18px 20px; border-radius: 10px; cursor: pointer; user-select: none;
+  transition: all .15s; background: linear-gradient(180deg,#1c1e25,#131419);
+  border: 1px solid var(--borda); box-shadow: inset 0 1px 0 rgba(255,255,255,.045);
+}
+.btn-geral .geral-nome { font-size: 16px; font-weight: 700; letter-spacing: .3px; color: var(--texto-claro); }
+.btn-geral .geral-status {
+  display: flex; align-items: center; gap: 8px; font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px; font-weight: 600; letter-spacing: 1.5px; padding: 7px 14px; border-radius: 999px;
+}
+.btn-geral .led { width: 8px; height: 8px; border-radius: 50%; }
+/* ligado = tocando normal (verde) */
+.btn-geral.ligado .geral-status { background: linear-gradient(180deg,#10231a,#0c1811); border: 1px solid #1f7a45; color: var(--verde-led); }
+.btn-geral.ligado .led { background: var(--verde-led); box-shadow: 0 0 6px var(--verde-led); }
+/* mutado = fora do ar (vermelho) */
+.btn-geral.mutado { border-color: #7a1f1f; box-shadow: inset 0 1px 0 rgba(255,255,255,.045), 0 0 0 1px #7a1f1f33; }
+.btn-geral.mutado .geral-status { background: linear-gradient(180deg,#2a1010,#1c0c0c); border: 1px solid #e5484d; color: #e5484d; }
+.btn-geral.mutado .led { background: #e5484d; box-shadow: 0 0 6px #e5484d; }
+
 /* -------------------- CHAT -------------------- */
 #painel-chat { display: none; }
 #painel-chat.ativo { display: flex; flex-direction: column; gap: 12px;
@@ -273,6 +319,8 @@ html, body {
   .topo-titulo strong { font-size: 17px; }
   .badge-mesa { padding: 4px 10px; gap: 6px; }
   .badge-mesa .txt { font-size: 9px; }
+  .topo-acoes { gap: 6px; }
+  .btn-trocar { padding: 5px 9px; font-size: 8px; }
 
   .abas { padding: 3px; margin-bottom: 6px; }
   .aba { padding: 6px; font-size: 11px; letter-spacing: 1px; }

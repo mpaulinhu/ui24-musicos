@@ -56,6 +56,9 @@ function resolverCanal(canalCfg) {
   };
 }
 
+// Canais do MUTE GERAL (aba "GERAL"), indexados por id, para consulta rapida.
+const muteGeralPorId = new Map(config.muteGeral.map((c) => [c.id, c]));
+
 let mesaConectada = false;
 
 mesa.on('status', (s) => {
@@ -151,6 +154,33 @@ mesa.on('parametro', ({ caminho, valor }) => {
         enviar(cli.ws, { tipo: 'master', aux, valor });
       }
     }
+    return;
+  }
+  // Mute GERAL de um canal (fora do fone, afeta tudo): i.<canal>.mute
+  // Repassa mesmo quando quem mudou foi o operador na mesa fisica, para
+  // TODOS os musicos ficarem sincronizados na aba "GERAL".
+  const mg = /^i\.(\d+)\.mute$/.exec(caminho);
+  if (mg) {
+    const canal = Number(mg[1]);
+    if (muteGeralPorId.has(canal)) {
+      transmitirParaTodosMusicos({ tipo: 'mute_geral', canal, mutado: Number(valor) === 1 });
+    }
+  }
+});
+
+// VU (medidor de audio ao vivo): a mesa manda o nivel de TODOS os canais
+// continuamente (~5x/seg). Para cada musico conectado, repassamos so os
+// niveis dos canais que ELE ve no fone dele.
+mesa.on('vu', (dados) => {
+  for (const cli of clientes) {
+    if (cli.tipo !== 'musico' || !cli.autenticado) continue;
+    const niveis = {};
+    for (const c of cli.musico.canais) {
+      const { canalMesa, tipo } = resolverCanal(c);
+      const arr = tipo === 'l' ? dados.line : dados.input;
+      if (arr && arr[canalMesa] != null) niveis[c.id] = arr[canalMesa];
+    }
+    enviar(cli.ws, { tipo: 'vu', niveis });
   }
 });
 
@@ -228,8 +258,10 @@ function configPublica() {
       id: m.id,
       nome: m.nome,
       aux: m.aux,
+      auxParceiro: m.auxParceiro,
       canais: m.canais,
     })),
+    muteGeral: config.muteGeral,
   };
 }
 
@@ -284,6 +316,8 @@ function tratarMensagem(cli, msg) {
       enviar(cli.ws, { tipo: 'login_ok', musico: { id: m.id, nome: m.nome, aux: m.aux, canais: m.canais } });
       // Manda o estado atual de cada canal do fone dele.
       enviarEstadoInicial(cli);
+      // Manda o estado atual dos 5 botoes de mute geral (aba "GERAL").
+      enviarEstadoMuteGeral(cli);
       // Chat geral: manda o historico do culto atual para o musico que entrou,
       // assim ele ja ve tudo que foi conversado.
       for (const item of historicoChat) enviar(cli.ws, { tipo: 'chat', ...item });
@@ -326,8 +360,11 @@ function tratarMensagem(cli, msg) {
       const canalCfg = cli.musico.canais.find((c) => c.id === msg.canal);
       const { canalMesa, tipo } = resolverCanal(canalCfg);
       const r = mesa.setNivelCanalAux(canalMesa, cli.musico.aux, msg.valor, tipo);
-      // Ecoa de volta para o proprio musico confirmar (a mesa tambem ecoa)
-      enviar(cli.ws, { tipo: 'parametro', canal: msg.canal, aux: cli.musico.aux, campo: 'value', valor: r.valor });
+      // Repassa para TODOS os dispositivos logados nesse MESMO fone (aux), nao
+      // so para quem mexeu — assim varios celulares no mesmo musico ficam
+      // sincronizados ao vivo (antes so o proprio dispositivo via na hora; os
+      // outros so pegavam a mudanca no proximo refresh periodico da mesa).
+      transmitirParaAux(cli.musico.aux, { tipo: 'parametro', canal: msg.canal, aux: cli.musico.aux, campo: 'value', valor: r.valor });
       break;
     }
 
@@ -337,7 +374,7 @@ function tratarMensagem(cli, msg) {
       const canalCfg = cli.musico.canais.find((c) => c.id === msg.canal);
       const { canalMesa, tipo } = resolverCanal(canalCfg);
       const r = mesa.setMixCanalAux(canalMesa, cli.musico.aux, !!msg.ligado, tipo);
-      enviar(cli.ws, { tipo: 'parametro', canal: msg.canal, aux: cli.musico.aux, campo: 'mix', valor: r.valor });
+      transmitirParaAux(cli.musico.aux, { tipo: 'parametro', canal: msg.canal, aux: cli.musico.aux, campo: 'mix', valor: r.valor });
       break;
     }
 
@@ -345,7 +382,23 @@ function tratarMensagem(cli, msg) {
     case 'set_master': {
       if (cli.tipo !== 'musico' || !cli.autenticado) return;
       const r = mesa.setMasterAux(cli.musico.aux, msg.valor);
-      enviar(cli.ws, { tipo: 'master', aux: cli.musico.aux, valor: r.valor });
+      transmitirParaAux(cli.musico.aux, { tipo: 'master', aux: cli.musico.aux, valor: r.valor });
+      break;
+    }
+
+    // ----- MUTE GERAL (aba "GERAL") — tira o canal de TUDO, nao so do fone.
+    //       Qualquer musico logado pode usar, independente do instrumento dele. -----
+    case 'set_mute_geral': {
+      if (cli.tipo !== 'musico' || !cli.autenticado) return;
+      const canalCfg = muteGeralPorId.get(msg.canal);
+      if (!canalCfg) return;
+      mesa.setMuteGeral(canalCfg.id, !!msg.mutado);
+      transmitirParaTodosMusicos({ tipo: 'mute_geral', canal: canalCfg.id, mutado: !!msg.mutado });
+      // Par estereo (ex: Teclado 1 = CH10+11): muta os dois juntos.
+      if (canalCfg.parceiro != null) {
+        mesa.setMuteGeral(canalCfg.parceiro, !!msg.mutado);
+        transmitirParaTodosMusicos({ tipo: 'mute_geral', canal: canalCfg.parceiro, mutado: !!msg.mutado });
+      }
       break;
     }
 
@@ -395,6 +448,22 @@ function podeMexer(cli, canal) {
   return cli.musico.canais.some((c) => c.id === canal);
 }
 
+// Envia para TODOS os dispositivos logados no MESMO fone (aux) — usado para
+// que varios celulares no mesmo musico fiquem sincronizados ao vivo entre si.
+function transmitirParaAux(aux, obj) {
+  for (const c of clientes) {
+    if (c.tipo === 'musico' && c.musico && c.musico.aux === aux) enviar(c.ws, obj);
+  }
+}
+
+// Envia para TODOS os musicos logados, independente do fone/aux — usado pelo
+// MUTE GERAL (aba "GERAL"), que e' compartilhado entre todos os instrumentos.
+function transmitirParaTodosMusicos(obj) {
+  for (const c of clientes) {
+    if (c.tipo === 'musico' && c.autenticado) enviar(c.ws, obj);
+  }
+}
+
 // Envia o estado atual (do cache da mesa) de cada canal do fone do musico.
 function enviarEstadoInicial(cli) {
   const aux = cli.musico.aux;
@@ -415,6 +484,17 @@ function enviarEstadoInicial(cli) {
   }
   const master = mesa.getEstado(mesa.caminhoMasterAux(aux));
   enviar(cli.ws, { tipo: 'master', aux, valor: master == null ? 0.75 : master });
+}
+
+// Envia o estado atual (do cache da mesa) dos 5 canais do MUTE GERAL —
+// mandado para TODO musico que loga, ja que a aba "GERAL" e' compartilhada.
+function enviarEstadoMuteGeral(cli) {
+  const estados = {};
+  for (const c of config.muteGeral) {
+    const mute = mesa.getEstado(mesa.caminhoMuteGeral(c.id));
+    estados[c.id] = mute == null ? false : Number(mute) === 1;
+  }
+  enviar(cli.ws, { tipo: 'estado_mute_geral', estados });
 }
 
 // ---- utilidades de envio ---------------------------------------------------

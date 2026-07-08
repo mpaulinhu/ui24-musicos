@@ -146,6 +146,11 @@ export class Ui24Client extends EventEmitter {
     this.ws.on('close', () => {
       this.conectado = false;
       clearInterval(this.heartbeatTimer);
+      // IMPORTANTE: zera o flag de socket.io para que, ao RECONECTAR,
+      // _ativarSocketio() rode de novo e RELIGUE o timer de refresh (GETSTAT).
+      // Sem isso, apos a primeira reconexao o servidor parava de re-consultar
+      // o estado da mesa e o mesa->app deixava de atualizar.
+      this.socketio = false;
       this.emit('status', { conectado: false, host: this.host, port: this.port });
       this._agendarReconexao('conexao fechada');
     });
@@ -226,6 +231,20 @@ export class Ui24Client extends EventEmitter {
 
     const caminho = corpo.slice(0, idx);
     const valorStr = corpo.slice(idx + 1);
+
+    // VU2: pacote binario (base64) com o NIVEL DE AUDIO AO VIVO de todos os
+    // canais (a mesa manda isso continuamente, ~5x/seg, sozinha — nao e um
+    // parametro tipo fader/mute). Formato mapeado pela comunidade (biblioteca
+    // "soundcraft-ui" no GitHub). Tratamos fora do fluxo generico de baixo,
+    // porque isso NUNCA deve ser cacheado/deduplicado (queremos sempre o
+    // frame mais recente) e precisa ser decodificado antes de ser util.
+    if (caminho === 'VU2') {
+      this.emit('bruto', { direcao: 'recebido', msg });
+      const dados = this._decodificarVU(valorStr);
+      if (dados) this.emit('vu', dados);
+      return;
+    }
+
     const valor = this._parseValor(valorStr);
 
     // DEDUP: como pedimos GETSTAT periodicamente (a mesa re-despeja o estado
@@ -239,6 +258,59 @@ export class Ui24Client extends EventEmitter {
     this.emit('bruto', { direcao: 'recebido', msg });
     // Avisa quem estiver ouvindo (o servidor) que um parametro mudou.
     this.emit('parametro', { caminho, valor });
+  }
+
+  /**
+   * Decodifica o pacote VU2 (base64) nos niveis de audio por canal.
+   * Layout binario mapeado pela comunidade: 7 bytes de cabecalho com a
+   * QUANTIDADE de canais de cada tipo (input, player, sub, fx, aux, master,
+   * line), 1 byte de preenchimento, e depois um bloco de bytes por canal
+   * (tamanho do bloco varia por tipo). Cada byte e' o nivel (0..255),
+   * convertido para 0..1 multiplicando pelo fator abaixo.
+   * So extraimos UM numero por canal (o nivel "pos-processamento", 2o byte
+   * do bloco em canais mono) — o suficiente para animar um medidor de VU.
+   */
+  _decodificarVU(base64) {
+    let bytes;
+    try {
+      bytes = Buffer.from(base64, 'base64');
+    } catch {
+      return null;
+    }
+    if (bytes.length < 8) return null;
+
+    const NORMALIZA = 0.004167508166392142; // fator da mesa (~1/240), mapeado pela comunidade
+    const tipos = [
+      { chave: 'input', qtd: bytes[0], tam: 6 },
+      { chave: 'player', qtd: bytes[1], tam: 6 },
+      { chave: 'sub', qtd: bytes[2], tam: 7 },
+      { chave: 'fx', qtd: bytes[3], tam: 7 },
+      { chave: 'aux', qtd: bytes[4], tam: 5 },
+      { chave: 'master', qtd: bytes[5], tam: 5 },
+      { chave: 'line', qtd: bytes[6], tam: 6 },
+    ];
+
+    const resultado = { input: [], player: [], sub: [], fx: [], aux: [], master: [], line: [] };
+    let i = 8; // pula o cabecalho
+    for (const tipo of tipos) {
+      for (let n = 0; n < (tipo.qtd || 0); n++) {
+        if (i + 1 >= bytes.length) break;
+        let nivel;
+        if (tipo.chave === 'fx' || tipo.chave === 'sub') {
+          // estereo: bloco e' [postL, postR, ...] -> usamos o maior dos dois
+          nivel = Math.max(bytes[i], bytes[i + 1]) * NORMALIZA;
+        } else if (tipo.chave === 'input' || tipo.chave === 'player' || tipo.chave === 'line') {
+          // bloco e' [vuPre, vuPost, vuPostFader, ...] -> byte 1 = vuPost
+          nivel = bytes[i + 1] * NORMALIZA;
+        } else {
+          // aux/master: bloco e' [vuPost, vuPostFader, ...] -> byte 0 = vuPost
+          nivel = bytes[i] * NORMALIZA;
+        }
+        resultado[tipo.chave].push(Math.min(1, nivel));
+        i += tipo.tam;
+      }
+    }
+    return resultado;
   }
 
   _parseValor(str) {
@@ -283,6 +355,20 @@ export class Ui24Client extends EventEmitter {
     const par = this._auxParceiro(aux);
     if (par != null) this._aplicarSetD(this.caminhoMix(canal, par, tipo), muteValor, String(muteValor));
     return { caminho, valor: ligado ? 1 : 0 };
+  }
+
+  /** Caminho do MUTE GERAL de um canal (desliga em TODOS os fones + no som
+   *  principal da igreja — diferente do mute de fone, que so afeta UM aux). */
+  caminhoMuteGeral(canal) {
+    return `i.${canal}.mute`;
+  }
+
+  /** Liga/desliga o MUTE GERAL de um canal inteiro (nao e' por fone). */
+  setMuteGeral(canal, mutado) {
+    const v = mutado ? 1 : 0;
+    const caminho = this.caminhoMuteGeral(canal);
+    this._aplicarSetD(caminho, v, String(v));
+    return { caminho, valor: v };
   }
 
   /** Volume geral (master) do fone de um musico. */

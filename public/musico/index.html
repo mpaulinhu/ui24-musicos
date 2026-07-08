@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#08090b" />
   <title>Monitor Mix - Musico</title>
+  <link rel="manifest" href="/musico/manifest.json" />
+  <link rel="icon" href="/musico/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/musico/icon.svg" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Mix de Fone" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -34,6 +41,8 @@
       <p id="login-erro" class="erro"></p>
 
       <div id="status-mesa" class="status-mesa">Conectando ao servidor…</div>
+      <button id="btn-instalar" class="link-instalar oculto">📲 Instalar como app</button>
+      <p id="dica-instalar" class="link-instalar oculto">📲 Toque em compartilhar e "Adicionar à Tela de Início"</p>
     </div>
   </section>
 
@@ -49,15 +58,19 @@
           <span class="eyebrow">MONITOR MIX · IEM</span>
           <strong id="nome-musico">—</strong>
         </div>
-        <div id="badge-mesa" class="badge-mesa off">
-          <span class="led"></span>
-          <span class="txt">MESA OFF</span>
+        <div class="topo-acoes">
+          <div id="badge-mesa" class="badge-mesa off">
+            <span class="led"></span>
+            <span class="txt">MESA OFF</span>
+          </div>
+          <button id="btn-trocar" class="btn-trocar" title="Trocar de musico">TROCAR</button>
         </div>
       </header>
 
       <!-- ABAS -->
       <nav class="abas">
         <div class="aba ativa" data-aba="mix">MIX</div>
+        <div class="aba" data-aba="geral">GERAL</div>
         <div class="aba" data-aba="chat">CHAT <span id="chat-badge" class="chat-badge oculto">0</span></div>
       </nav>
 
@@ -77,6 +90,12 @@
         </div>
 
         <div id="faders" class="faders"><!-- gerado por JS --></div>
+      </div>
+
+      <!-- ---- PAINEL GERAL (mute geral - tira o instrumento de TUDO) ---- -->
+      <div id="painel-geral" class="painel">
+        <div class="geral-aviso">Estes botões tiram o instrumento de <strong>todos os fones</strong> e do <strong>som principal</strong> da igreja — use quando não estiver tocando.</div>
+        <div id="geral-botoes" class="geral-botoes"><!-- gerado por JS --></div>
       </div>
 
       <!-- ---- PAINEL CHAT ---- -->

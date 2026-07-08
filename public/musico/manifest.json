@@ -1,0 +1,15 @@
+{
+  "name": "Mix de Fone - Musico",
+  "short_name": "Mix de Fone",
+  "description": "Controle o seu fone individual (in-ear) da mesa Ui24R",
+  "start_url": "/musico",
+  "scope": "/musico",
+  "display": "standalone",
+  "background_color": "#08090b",
+  "theme_color": "#08090b",
+  "orientation": "any",
+  "icons": [
+    { "src": "/musico/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/musico/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

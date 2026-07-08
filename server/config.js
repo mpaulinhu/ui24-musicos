@@ -109,13 +109,15 @@ export const config = {
       nome: 'Baterista',
       senha: '1111',
       aux: 8, // fone BATERISTA (estereo 8+9 -> usa o indice da esquerda: 8)
+      auxParceiro: 9, // outro lado do par estereo (so' para mostrar na tela de login)
       canais: canaisTodos,
     },
     {
       id: 'guivio',
-      nome: 'Guitarra / Violao',
+      nome: 'Guitarra / Baixo',
       senha: '2222',
       aux: 5, // fone GUI/VIO (estereo 5+6 -> usa 5)
+      auxParceiro: 6,
       canais: canaisTodos,
     },
     {
@@ -123,15 +125,37 @@ export const config = {
       nome: 'Teclado',
       senha: '3333',
       aux: 2, // fone TECLADO (estereo 2+3 -> usa 2)
+      auxParceiro: 3,
       canais: canaisTodos,
     },
     {
       id: 'teclado2',
-      nome: 'Teclado 2',
+      nome: 'Tec/Vio',
       senha: '4444',
-      aux: 4, // fone TECLADO 2 (mono)
+      aux: 4, // fone TECLADO 2 (mono, sem parceiro)
       canais: canaisTodos,
     },
+  ],
+
+  // --------------------------------------------------------------------------
+  //  MUTE GERAL (aba "GERAL") — botoes que mutam o canal por INTEIRO: em
+  //  TODOS os fones + no som principal (PA) da igreja. Diferente do mute
+  //  normal (que so tira do fone de UM musico). TODOS os musicos veem e
+  //  podem usar esses 5, independente do instrumento que cada um toca —
+  //  serve para o musico se tirar sozinho quando nao esta tocando, sem
+  //  precisar chamar o operador da mesa.
+  //
+  //  ATENCAO: a numeracao "Teclado 1/2" aqui e' por INSTRUMENTO (Teclado 1 =
+  //  o teclado estereo, Teclado 2 = o segundo teclado, mono) e NAO bate com
+  //  os nomes "Teclado 1/2/3" da lista de canais acima (que numeram por
+  //  CANAL da mesa). Teclado 1 (aqui) = CH10+11. Teclado 2 (aqui) = CH12.
+  // --------------------------------------------------------------------------
+  muteGeral: [
+    { id: 0,  nome: 'Guitarra' },
+    { id: 1,  nome: 'Baixo' },
+    { id: 17, nome: 'Violao' },                  // canal "CORINGA" na mesa
+    { id: 9,  nome: 'Teclado 1', parceiro: 10 }, // estereo (CH10+11)
+    { id: 11, nome: 'Teclado 2' },               // CH12, mono
   ],
 
   // --------------------------------------------------------------------------

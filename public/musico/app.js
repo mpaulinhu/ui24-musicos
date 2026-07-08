@@ -7,6 +7,36 @@
 
 const $ = (sel) => document.querySelector(sel);
 
+// PWA: registra o service worker (permite "instalar" na tela inicial).
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/musico/sw.js').catch(() => {});
+}
+
+// PWA: mostra um jeito discreto de instalar, so' se ainda NAO estiver instalado.
+(function ligarInstalarPWA() {
+  const jaInstalado = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+  if (jaInstalado) return;
+
+  const ehIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  let promptEvento = null;
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    promptEvento = e;
+    document.getElementById('btn-instalar').classList.remove('oculto');
+  });
+
+  document.getElementById('btn-instalar').addEventListener('click', async () => {
+    if (!promptEvento) return;
+    promptEvento.prompt();
+    await promptEvento.userChoice;
+    promptEvento = null;
+    document.getElementById('btn-instalar').classList.add('oculto');
+  });
+
+  if (ehIOS) document.getElementById('dica-instalar').classList.remove('oculto');
+})();
+
 /**
  * Throttle com "trailing edge" garantido: limita fn a rodar no maximo uma vez
  * a cada intervaloMs, mas SEMPRE executa a ultima chamada recebida (atrasada,
@@ -51,6 +81,30 @@ let ultimoLogin = null;       // { musicoId, senha } — para reconectar sozinho
 
 // canal.id -> { pct, on, color, el:{band,fill,cap,valor,btn,ledBtn,vuFill,vuPeak,faderTrack} }
 const canais = {};
+
+// ---------------------------------------------------------------------------
+//  LOGIN LEMBRADO (localStorage) — evita pedir a senha de novo toda vez que a
+//  pagina recarrega (ex: o celular "mata" a aba, ou o musico da um refresh).
+//  Fica guardado por algumas horas; depois disso pede a senha de novo.
+// ---------------------------------------------------------------------------
+const CHAVE_LOGIN_SALVO = 'mixdefone_login';
+const DURACAO_LOGIN_MS = 12 * 60 * 60 * 1000; // 12 horas
+
+function salvarLogin(login) {
+  localStorage.setItem(CHAVE_LOGIN_SALVO, JSON.stringify({ ...login, expira: Date.now() + DURACAO_LOGIN_MS }));
+}
+function lerLoginSalvo() {
+  try {
+    const bruto = localStorage.getItem(CHAVE_LOGIN_SALVO);
+    if (!bruto) return null;
+    const { musicoId, senha, expira } = JSON.parse(bruto);
+    if (!musicoId || !senha || !expira || Date.now() > expira) return null;
+    return { musicoId, senha };
+  } catch { return null; }
+}
+function esquecerLogin() {
+  localStorage.removeItem(CHAVE_LOGIN_SALVO);
+}
 
 // ---------------------------------------------------------------------------
 //  Cor unica (amarelo) para todos os canais — visual consistente de console.
@@ -110,6 +164,7 @@ function tratar(msg) {
     case 'mesa_status': mesaConectada = msg.conectado; atualizarBadgeMesa(); setStatusMesa(); break;
     case 'login_ok':
       musico = msg.musico;
+      if (ultimoLogin) salvarLogin(ultimoLogin); // renova a validade a cada login/reconexao
       entrarNoMixer();
       $('#chat-mensagens').innerHTML = '';
       zerarNaoLidas();
@@ -119,6 +174,8 @@ function tratar(msg) {
       break;
     case 'login_falhou':
       ultimoLogin = null;
+      esquecerLogin(); // credencial salva nao serve mais (ex: senha mudou)
+      mostrarTelaLogin();
       $('#login-erro').textContent = msg.motivo || 'Falha no login';
       break;
     case 'estado_canal': aplicarNivel(msg.canal, msg.nivel); aplicarMix(msg.canal, msg.mix); break;
@@ -127,6 +184,13 @@ function tratar(msg) {
       if (msg.campo === 'mix') aplicarMix(msg.canal, msg.valor);
       break;
     case 'master': aplicarMaster(msg.valor); break;
+    case 'vu':
+      for (const id in msg.niveis) setNivelAudio(id, msg.niveis[id]);
+      break;
+    case 'estado_mute_geral':
+      for (const id in msg.estados) desenharMuteGeral(id, msg.estados[id]);
+      break;
+    case 'mute_geral': desenharMuteGeral(msg.canal, msg.mutado); break;
     case 'chat': receberChat(msg); break;
   }
 }
@@ -142,9 +206,12 @@ async function montarLogin() {
   for (const m of cfg.musicos) {
     const opt = document.createElement('option');
     opt.value = m.id;
-    opt.textContent = `${m.nome} (fone ${m.aux + 1})`;
+    opt.textContent = m.nome;
     sel.appendChild(opt);
   }
+  // Aba GERAL: compartilhada por todos os musicos, entao monta uma vez so,
+  // independente de quem vai logar.
+  montarPainelGeral(cfg.muteGeral || []);
 }
 
 function setStatusMesa(txtForcado) {
@@ -163,6 +230,24 @@ $('#btn-entrar').addEventListener('click', () => {
   enviar({ tipo: 'login_musico', musicoId, senha });
 });
 $('#inp-senha').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#btn-entrar').click(); });
+
+// ---------------------------------------------------------------------------
+//  TROCAR DE MUSICO — volta pra tela de login sem precisar recarregar a
+//  pagina, para outra pessoa entrar com o proprio usuario/senha.
+// ---------------------------------------------------------------------------
+$('#btn-trocar').addEventListener('click', () => {
+  ultimoLogin = null;
+  esquecerLogin();
+  musico = null;
+  mostrarTelaLogin();
+});
+
+function mostrarTelaLogin() {
+  $('#tela-mixer').classList.remove('ativa');
+  $('#tela-login').classList.add('ativa');
+  $('#login-erro').textContent = '';
+  $('#inp-senha').value = '';
+}
 
 // ---------------------------------------------------------------------------
 //  ENTRAR NO MIXER — monta os canais
@@ -244,11 +329,17 @@ function criarCanal(canal, indice) {
     enviarNivelThrottled(pct);
   });
 
-  // botao ON/OFF (mute)
+  // botao ON/OFF (mute) — mesma regra do fader: se o canal tem "parceiro"
+  // (par estereo), muta/desmuta os dois juntos.
   ref.btn.addEventListener('click', () => {
     ref.on = !ref.on;
     enviar({ tipo: 'set_mix', canal: canal.id, ligado: ref.on });
     desenharBotao(canal.id);
+    if (canal.parceiro != null && canais[canal.parceiro]) {
+      canais[canal.parceiro].on = ref.on;
+      enviar({ tipo: 'set_mix', canal: canal.parceiro, ligado: ref.on });
+      desenharBotao(canal.parceiro);
+    }
   });
 
   desenharFader(canal.id);
@@ -341,42 +432,42 @@ function desenharMaster() {
 // ---------------------------------------------------------------------------
 //  VU METERS (medidores de audio ao lado de cada fader)
 // ---------------------------------------------------------------------------
-//  IMPORTANTE: por enquanto NAO existe animacao "fake". Os medidores so se
-//  mexem se receberem o nivel REAL de audio da mesa. Como ainda nao captamos
-//  o metering da Ui24R, eles ficam parados/vazios (comportamento honesto).
-//
-//  Quando ligarmos o metering real (na igreja), basta chamar:
-//     setNivelAudio(canalId, nivel)   // nivel de 0.0 a 1.0
-//  e o medidor daquele canal passa a refletir o audio de verdade.
+//  Recebe o nivel de audio REAL da mesa (campo VU2 do protocolo, decodificado
+//  no servidor), que chega uns 5x por segundo — nao e' audio-rate, entao o
+//  visual usa "alvo" (ultimo valor recebido) + "exibido" (o que aparece na
+//  tela), subindo rapido (resposta imediata) e descendo suave entre
+//  atualizacoes, para nao piscar entre os ~200ms de cada pacote.
 // ---------------------------------------------------------------------------
-let vuMedidas = {}, vuPeaks = {};
+let vuAlvo = {}, vuExibido = {}, vuPeaks = {};
 
-/** Recebe o nivel de audio REAL de um canal (0..1) e anima o medidor suavemente. */
+/** Recebe o nivel de audio REAL de um canal (0..1) vindo do servidor. */
 function setNivelAudio(id, nivel) {
   const r = canais[id]; if (!r) return;
   const t = clamp01(nivel);
-  if (vuMedidas[id] == null) { vuMedidas[id] = 0; vuPeaks[id] = 0; }
-  vuMedidas[id] = t;
+  vuAlvo[id] = t;
+  if (vuExibido[id] == null) vuExibido[id] = 0;
+  if (vuPeaks[id] == null) vuPeaks[id] = 0;
   if (t > vuPeaks[id]) vuPeaks[id] = t;
 }
 
-/** Loop leve so para o decaimento suave do "peak" e desenhar. Nao inventa sinal. */
+/** Loop de desenho: sobe rapido ate o alvo, desce suave (efeito de VU natural). */
 function loopVU() {
   requestAnimationFrame(loopVU);
   for (const id in canais) {
     const r = canais[id];
-    const v = vuMedidas[id] || 0;
-    // o pico desce devagar; o nivel some quando nao ha audio
-    vuPeaks[id] = Math.max(v, (vuPeaks[id] || 0) - 0.006);
+    const alvo = vuAlvo[id] || 0;
+    const atual = vuExibido[id] || 0;
+    const v = alvo >= atual ? alvo : atual + (alvo - atual) * 0.15;
+    vuExibido[id] = v;
+    // o pico desce devagar (peak-hold classico)
+    vuPeaks[id] = Math.max(alvo, (vuPeaks[id] || 0) - 0.006);
     r.vuFill.style.height = (v * 100).toFixed(1) + '%';
     r.vuPeak.style.bottom = ((vuPeaks[id] || 0) * 100).toFixed(1) + '%';
-    // sem audio novo, o nivel decai ate zerar
-    vuMedidas[id] = Math.max(0, v - 0.05);
   }
 }
 requestAnimationFrame(loopVU);
 
-// Deixa acessivel para quando ligarmos o metering real da mesa.
+// Exposto no window so' para depuracao manual no console do navegador.
 window.setNivelAudio = setNivelAudio;
 
 // ---------------------------------------------------------------------------
@@ -439,7 +530,7 @@ window.setNivelAudio = setNivelAudio;
 })();
 
 // ---------------------------------------------------------------------------
-//  ABAS (Mix / Chat)
+//  ABAS (Mix / Geral / Chat)
 // ---------------------------------------------------------------------------
 document.querySelectorAll('.aba').forEach((aba) => {
   aba.addEventListener('click', () => {
@@ -447,10 +538,52 @@ document.querySelectorAll('.aba').forEach((aba) => {
     aba.classList.add('ativa');
     abaAtual = aba.dataset.aba;
     $('#painel-mix').classList.toggle('ativo', abaAtual === 'mix');
+    $('#painel-geral').classList.toggle('ativo', abaAtual === 'geral');
     $('#painel-chat').classList.toggle('ativo', abaAtual === 'chat');
     if (abaAtual === 'chat') zerarNaoLidas();
   });
 });
+
+// ---------------------------------------------------------------------------
+//  MUTE GERAL (aba "GERAL") — tira o instrumento de TUDO (todos os fones +
+//  som principal), nao so do fone de um musico. Compartilhado entre todos.
+// ---------------------------------------------------------------------------
+const muteGeralRefs = {}; // canal.id -> { el, status, led, texto, parceiro }
+
+function montarPainelGeral(lista) {
+  const cont = $('#geral-botoes');
+  cont.innerHTML = '';
+  for (const c of Object.keys(muteGeralRefs)) delete muteGeralRefs[c];
+
+  for (const canal of lista) {
+    const box = document.createElement('div');
+    box.className = 'btn-geral ligado';
+    box.innerHTML = `
+      <span class="geral-nome">${escapar(canal.nome)}</span>
+      <span class="geral-status"><span class="led"></span><span class="texto">TOCANDO</span></span>
+    `;
+    muteGeralRefs[canal.id] = {
+      el: box,
+      status: box.querySelector('.geral-status'),
+      texto: box.querySelector('.texto'),
+      parceiro: canal.parceiro,
+    };
+    box.addEventListener('click', () => {
+      const mutadoAtual = box.classList.contains('mutado');
+      const novoMutado = !mutadoAtual;
+      desenharMuteGeral(canal.id, novoMutado); // feedback instantaneo
+      enviar({ tipo: 'set_mute_geral', canal: canal.id, mutado: novoMutado });
+    });
+    cont.appendChild(box);
+  }
+}
+
+function desenharMuteGeral(canalId, mutado) {
+  const r = muteGeralRefs[canalId]; if (!r) return;
+  r.el.classList.toggle('mutado', mutado);
+  r.el.classList.toggle('ligado', !mutado);
+  r.texto.textContent = mutado ? 'MUTADO' : 'TOCANDO';
+}
 
 // ---------------------------------------------------------------------------
 //  CHAT
@@ -498,5 +631,8 @@ function escapar(s) {
 }
 
 // ---------------------------------------------------------------------------
+// Se tiver um login salvo e ainda valido, entra sozinho sem pedir senha de
+// novo (ate a validade expirar — ver DURACAO_LOGIN_MS).
+ultimoLogin = lerLoginSalvo();
 montarLogin();
 conectar();
