@@ -203,7 +203,8 @@ function tratar(msg) {
       break;
     case 'mute_geral': desenharMuteGeral(msg.canal, msg.mutado); break;
     case 'chat': receberChat(msg); break;
-    case 'chamar_atencao': chamarAtencao(); break;
+    case 'chamar_atencao': chamarAtencao(msg.de); break;
+    case 'presenca': montarListaChamar(msg.online || []); break;
   }
 }
 
@@ -214,10 +215,10 @@ function tratar(msg) {
 //  aba do chat.
 // ---------------------------------------------------------------------------
 let _audioCtxAlerta = null;
-function chamarAtencao() {
+function chamarAtencao(de) {
   if (navigator.vibrate) navigator.vibrate([300, 120, 300, 120, 300]);
   tocarAlertaSonoro();
-  mostrarAviso('🔔 A house mix está chamando sua atenção!');
+  mostrarAviso(`🔔 ${de || 'Alguém'} está chamando sua atenção!`);
 }
 function tocarAlertaSonoro() {
   try {
@@ -631,6 +632,34 @@ function desenharMuteGeral(canalId, mutado) {
 }
 
 // ---------------------------------------------------------------------------
+//  CHAMAR ATENCAO de outro musico (mesma ideia do botao da house mix, mas
+//  entre os proprios musicos). Lista chega via mensagem 'presenca' do
+//  servidor — a mesma usada para a house mix ver quem esta online.
+// ---------------------------------------------------------------------------
+function montarListaChamar(lista) {
+  const cont = $('#chamar-lista');
+  if (!cont) return;
+  const outros = lista.filter((p) => !musico || p.id !== musico.id);
+  if (!outros.length) {
+    cont.innerHTML = '<span class="chamar-vazio">Nenhum outro músico online agora.</span>';
+    return;
+  }
+  cont.innerHTML = '';
+  for (const p of outros) {
+    const chip = document.createElement('button');
+    chip.className = 'chamar-chip' + (p.reconectando ? ' reconectando' : '');
+    chip.title = `Chamar atenção de ${p.nome}`;
+    chip.innerHTML = `<span class="chamar-nome">${escapar(p.nome)}</span><span class="chamar-sino">🔔</span>`;
+    chip.addEventListener('click', () => {
+      enviar({ tipo: 'chamar_atencao', musicoId: p.id });
+      chip.classList.add('tocado');
+      setTimeout(() => chip.classList.remove('tocado'), 600);
+    });
+    cont.appendChild(chip);
+  }
+}
+
+// ---------------------------------------------------------------------------
 //  CHAT
 // ---------------------------------------------------------------------------
 function enviarChat(texto) {
@@ -648,7 +677,9 @@ function receberChat(msg) {
   const div = document.createElement('div');
   const minha = msg.de === (musico && musico.nome);
   div.className = 'msg ' + (minha ? 'minha' : 'deles');
-  let html = `<span class="autor">${escapar(msg.de)}</span>`;
+  // Nas MINHAS mensagens nao mostra meu proprio nome (redundante, igual WhatsApp);
+  // nas dos outros, mostra quem enviou.
+  let html = minha ? '' : `<span class="autor">${escapar(msg.de)}</span>`;
   if (msg.texto) html += escapar(msg.texto);
   if (msg.imagem) html += `<img class="msg-imagem" src="${msg.imagem}" alt="foto" />`;
   if (msg.audio) html += `<audio class="msg-audio" src="${msg.audio}" controls></audio>`;
@@ -723,6 +754,25 @@ function clamp01(n) { n = Number(n); if (!isFinite(n)) return 0; return Math.max
 function escapar(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
+
+// ---------------------------------------------------------------------------
+//  Clicar numa foto do chat abre ela AMPLIADA (lightbox). Fecha ao tocar de
+//  novo, no X, ou apertando Esc.
+// ---------------------------------------------------------------------------
+(function ligarLightbox() {
+  let overlay = null;
+  function fechar() { if (overlay) { overlay.remove(); overlay = null; } }
+  document.addEventListener('click', (e) => {
+    const img = e.target.closest && e.target.closest('.msg-imagem');
+    if (!img) { return; }
+    overlay = document.createElement('div');
+    overlay.className = 'lightbox';
+    overlay.innerHTML = `<button class="lightbox-fechar" aria-label="Fechar">✕</button><img src="${img.src}" alt="foto ampliada" />`;
+    overlay.addEventListener('click', fechar);
+    document.body.appendChild(overlay);
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') fechar(); });
+})();
 
 // ---------------------------------------------------------------------------
 // Se tiver um login salvo e ainda valido, entra sozinho sem pedir senha de

@@ -80,6 +80,7 @@ $('#inp-senha').addEventListener('keydown', (e) => {
 });
 
 // ---------------- MENSAGENS ----------------
+let ultimoAutor = null; // para agrupar mensagens seguidas da mesma pessoa
 function mostrarMensagem(msg) {
   const cont = $('#mensagens');
   const vazio = cont.querySelector('.vazio');
@@ -87,17 +88,21 @@ function mostrarMensagem(msg) {
 
   const ehHouse = msg.papel === 'housemix';
   const urgente = URGENTES.some((p) => (msg.texto || '').toLowerCase().includes(p));
+  // Se a mensagem anterior e' da MESMA pessoa, nao repete o cabecalho (nome/hora),
+  // igual WhatsApp — evita ver "Baterista" varias vezes seguidas.
+  const agrupada = msg.de === ultimoAutor;
+  ultimoAutor = msg.de;
 
   const div = document.createElement('div');
-  div.className = 'cartao' + (ehHouse ? ' housemix' : '') + (urgente ? ' urgente' : '');
+  div.className = 'cartao' + (ehHouse ? ' housemix' : '') + (urgente ? ' urgente' : '') + (agrupada ? ' agrupada' : '');
   let midia = '';
   if (msg.imagem) midia += `<img class="msg-imagem" src="${msg.imagem}" alt="foto" />`;
   if (msg.audio) midia += `<audio class="msg-audio" src="${msg.audio}" controls></audio>`;
   div.innerHTML = `
-    <div class="cab">
+    ${agrupada ? '' : `<div class="cab">
       <span class="autor">${escapar(msg.de)}</span>
       <span class="hora">${horaAgora()}</span>
-    </div>
+    </div>`}
     ${msg.texto ? `<div class="texto">${escapar(msg.texto)}</div>` : ''}
     ${midia}
   `;
@@ -114,8 +119,9 @@ function mostrarPresenca(lista) {
   el.innerHTML = '';
   for (const p of lista) {
     const chip = document.createElement('span');
-    chip.className = 'chip';
-    chip.innerHTML = `<span class="chip-nome">${escapar(p.nome)} (fone ${p.aux + 1})</span>`;
+    chip.className = 'chip' + (p.reconectando ? ' reconectando' : '');
+    const sufixo = p.reconectando ? ' · reconectando…' : '';
+    chip.innerHTML = `<span class="chip-nome">${escapar(p.nome)} (fone ${p.aux + 1})${sufixo}</span>`;
 
     const sino = document.createElement('button');
     sino.className = 'chip-sino';
@@ -147,6 +153,7 @@ $('#resp-input').addEventListener('keydown', (e) => {
 // ---------------- LIMPAR ----------------
 $('#btn-limpar').addEventListener('click', () => {
   $('#mensagens').innerHTML = '<div class="vazio">Tela limpa. Aguardando mensagens…</div>';
+  ultimoAutor = null;
 });
 
 // ---------------- helpers ----------------
@@ -178,6 +185,22 @@ function tocarBeep(urgente) {
 function escapar(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
+
+// Clicar numa foto do chat abre ela AMPLIADA (lightbox). Fecha ao clicar/Esc.
+(function ligarLightbox() {
+  let overlay = null;
+  function fechar() { if (overlay) { overlay.remove(); overlay = null; } }
+  document.addEventListener('click', (e) => {
+    const img = e.target.closest && e.target.closest('.msg-imagem');
+    if (!img) { return; }
+    overlay = document.createElement('div');
+    overlay.className = 'lightbox';
+    overlay.innerHTML = `<button class="lightbox-fechar" aria-label="Fechar">✕</button><img src="${img.src}" alt="foto ampliada" />`;
+    overlay.addEventListener('click', fechar);
+    document.body.appendChild(overlay);
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') fechar(); });
+})();
 
 ultimaSenha = lerLoginSalvo(); // entra sozinho se ja tiver logado antes (ate expirar)
 conectar();

@@ -95,6 +95,9 @@ html, body {
   background: linear-gradient(180deg,#10231a,#0c1811); border: 1px solid #1f7a45;
 }
 .lista-presenca .chip::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--verde-led); box-shadow: 0 0 6px var(--verde-led); }
+.lista-presenca .chip.reconectando { opacity: .55; border-style: dashed; }
+.lista-presenca .chip.reconectando::before { background: var(--amarelo); box-shadow: none; animation: gravandoPulse 1s ease-in-out infinite; }
+@keyframes gravandoPulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
 .chip-sino {
   flex: none; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
   padding: 0; font-size: 13px; line-height: 1; background: rgba(255,255,255,.06); border: none; border-radius: 50%;
@@ -120,6 +123,8 @@ html, body {
 }
 .vazio { margin: auto; color: var(--texto-mono); font-size: 20px; }
 
+/* mensagem agrupada (mesma pessoa, logo em seguida): sem cabecalho, colada na de cima */
+.cartao.agrupada { margin-top: -8px; }
 .cartao {
   background: linear-gradient(180deg,#1c1e25,#161820); border: 1px solid var(--borda); border-left: 5px solid var(--azul);
   border-radius: 10px; padding: 16px 22px; box-shadow: 0 2px 6px rgba(0,0,0,.4); animation: entrar .25s ease-out;
@@ -131,7 +136,18 @@ html, body {
 .cartao.housemix .autor { color: var(--amarelo); }
 .cartao .hora { font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--texto-mono); }
 .cartao .texto { font-size: 26px; line-height: 1.35; color: #eef1f6; }
-.msg-imagem { display: block; max-width: 100%; max-height: 360px; border-radius: 10px; margin-top: 10px; }
+.msg-imagem { display: block; max-width: 100%; max-height: 360px; border-radius: 10px; margin-top: 10px; cursor: zoom-in; }
+
+/* Foto ampliada (lightbox) — cobre a tela toda, fecha ao clicar/Esc/X */
+.lightbox {
+  position: fixed; inset: 0; z-index: 2000; display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,.92); padding: 20px; cursor: zoom-out;
+}
+.lightbox img { max-width: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 8px 40px rgba(0,0,0,.6); }
+.lightbox-fechar {
+  position: fixed; top: 16px; right: 18px; width: 44px; height: 44px; font-size: 22px;
+  color: #fff; background: rgba(255,255,255,.14); border: none; border-radius: 50%; cursor: pointer;
+}
 .msg-audio { display: block; width: 100%; max-width: 420px; margin-top: 10px; }
 
 /* rodape */

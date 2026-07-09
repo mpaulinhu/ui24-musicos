@@ -275,6 +275,17 @@ const wss = new WebSocketServer({ server: httpServer, maxPayload: 8 * 1024 * 102
 // Lista de clientes conectados
 const clientes = new Set();
 
+// Presenca "com tolerancia": celular apaga a tela / rede oscila e o
+// WebSocket cai por alguns segundos o tempo todo — isso NAO deveria fazer o
+// musico sumir da lista da house mix instantaneamente nem invalidar o botao
+// de "chamar atencao". Guardamos 1 registro por musico (nao por conexao) e
+// so tiramos da lista depois de ficar sem NENHUM dispositivo conectado por
+// GRACA_OFFLINE_MS seguidos. Se a house mix mandar "chamar atencao" durante
+// esse intervalo sem conexao ativa, o alerta fica pendente e e' entregue
+// assim que ele reconectar (login automatico costuma ser em segundos).
+const presencaMusicos = new Map(); // musicoId -> { nome, aux, conexoes:Set<cli>, alertaPendente, timeoutSaida }
+const GRACA_OFFLINE_MS = 60_000;
+
 // Historico curto do chat (para quem entra depois ver as ultimas). So em
 // memoria (nunca grava em disco/banco) — some sozinho quando o servidor
 // reinicia, de proposito (fotos/audios sao so para o culto do dia).
@@ -300,7 +311,20 @@ wss.on('connection', (ws) => {
 
   ws.on('close', () => {
     clientes.delete(cli);
-    // Avisa a house mix que alguem saiu (para lista de presenca)
+    if (cli.tipo === 'musico' && cli.musico) {
+      const p = presencaMusicos.get(cli.musico.id);
+      if (p) {
+        p.conexoes.delete(cli);
+        // So agenda a saida quando o ULTIMO dispositivo desse musico cair —
+        // se ele tem 2 celulares logados, sair de um nao tira ele da lista.
+        if (p.conexoes.size === 0 && !p.timeoutSaida) {
+          p.timeoutSaida = setTimeout(() => {
+            presencaMusicos.delete(cli.musico.id);
+            transmitirPresenca();
+          }, GRACA_OFFLINE_MS);
+        }
+      }
+    }
     transmitirPresenca();
   });
 });
@@ -326,6 +350,16 @@ function tratarMensagem(cli, msg) {
       // Chat geral: manda o historico do culto atual para o musico que entrou,
       // assim ele ja ve tudo que foi conversado.
       for (const item of historicoChat) enviar(cli.ws, { tipo: 'chat', ...item });
+
+      // Registra/renova a presenca "com tolerancia" desse musico.
+      let p = presencaMusicos.get(m.id);
+      if (!p) { p = { nome: m.nome, aux: m.aux, conexoes: new Set() }; presencaMusicos.set(m.id, p); }
+      p.nome = m.nome;
+      p.conexoes.add(cli);
+      if (p.timeoutSaida) { clearTimeout(p.timeoutSaida); p.timeoutSaida = null; }
+      // Reconectou dentro da janela de tolerancia com um alerta esperando: entrega agora.
+      if (p.alertaPendente) { chamarAtencaoAgora(cli.ws, p.alertaPendente); p.alertaPendente = false; }
+
       transmitirPresenca();
       break;
     }
@@ -431,10 +465,20 @@ function tratarMensagem(cli, msg) {
       break;
     }
 
-    // ----- HOUSE MIX chama a atencao de UM musico especifico (vibra/apita o celular dele) -----
+    // ----- Chama a atencao de UM musico especifico (vibra/apita o celular dele).
+    //       Tanto a house mix quanto os proprios musicos (entre si) podem usar.
+    //       Se ele estiver "na tolerancia" (tela apagou, reconectando), o alerta fica
+    //       pendente e e' entregue assim que ele voltar. -----
     case 'chamar_atencao': {
-      if (cli.tipo !== 'housemix' || !cli.autenticado) return;
-      transmitirParaMusico(msg.musicoId, { tipo: 'chamar_atencao' });
+      if (!cli.autenticado || (cli.tipo !== 'housemix' && cli.tipo !== 'musico')) return;
+      const p = presencaMusicos.get(msg.musicoId);
+      if (!p) return; // nunca logou nessa sessao do servidor: nada a fazer
+      const de = cli.tipo === 'housemix' ? 'House Mix' : cli.nome;
+      if (p.conexoes.size > 0) {
+        for (const c of p.conexoes) chamarAtencaoAgora(c.ws, de);
+      } else {
+        p.alertaPendente = de;
+      }
       break;
     }
 
@@ -484,12 +528,8 @@ function transmitirParaTodosMusicos(obj) {
   }
 }
 
-// Envia para TODOS os dispositivos logados como ESSE musico especifico (por id
-// do config, ex: "baterista") — usado pelo botao de "chamar atencao".
-function transmitirParaMusico(musicoId, obj) {
-  for (const c of clientes) {
-    if (c.tipo === 'musico' && c.musico && c.musico.id === musicoId) enviar(c.ws, obj);
-  }
+function chamarAtencaoAgora(ws, de) {
+  enviar(ws, { tipo: 'chamar_atencao', de });
 }
 
 // Envia o estado atual (do cache da mesa) de cada canal do fone do musico.
@@ -550,16 +590,17 @@ function transmitir(obj) {
   for (const c of clientes) enviar(c.ws, obj);
 }
 
-// Informa a house mix quem esta online (lista de presenca).
+// Informa a house mix quem esta "online" (inclui quem esta na janela de
+// tolerancia sem nenhum dispositivo conectado no momento — reconectando).
 function transmitirPresenca() {
   const online = [];
-  for (const c of clientes) {
-    if (c.tipo === 'musico' && c.autenticado) {
-      online.push({ id: c.musico.id, nome: c.nome, aux: c.musico.aux });
-    }
+  for (const [id, p] of presencaMusicos) {
+    online.push({ id, nome: p.nome, aux: p.aux, reconectando: p.conexoes.size === 0 });
   }
   for (const c of clientes) {
-    if (c.tipo === 'housemix') enviar(c.ws, { tipo: 'presenca', online });
+    // Musicos tambem recebem a lista (para poderem chamar a atencao uns dos
+    // outros) — o proprio app do musico filtra o proprio nome na hora de mostrar.
+    if (c.tipo === 'housemix' || c.tipo === 'musico') enviar(c.ws, { tipo: 'presenca', online });
   }
 }
 

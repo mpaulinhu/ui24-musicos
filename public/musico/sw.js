@@ -1,8 +1,8 @@
 // Service worker minimo: so o suficiente para o navegador considerar o app
 // "instalavel" (PWA) e abrir rapido/offline como concha (o mix ao vivo
 // sempre precisa de rede de verdade, isso aqui nao cacheia dados da mesa).
-const CACHE = 'mixdefone-v5';
-const ASSETS = ['/musico', '/musico/index.html', '/musico/style.css?v=5', '/musico/app.js?v=5', '/musico/icon.svg'];
+const CACHE = 'mixdefone-v8';
+const ASSETS = ['/musico', '/musico/index.html', '/musico/style.css?v=8', '/musico/app.js?v=8', '/musico/icon.svg'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)));

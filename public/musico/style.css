@@ -329,6 +329,25 @@ html, body {
 .btn-geral.mutado .geral-status { background: linear-gradient(180deg,#2a1010,#1c0c0c); border: 1px solid #e5484d; color: #e5484d; }
 .btn-geral.mutado .led { background: #e5484d; box-shadow: 0 0 6px #e5484d; }
 
+/* -------------------- CHAMAR ATENCAO (entre musicos) -------------------- */
+.geral-secao-titulo {
+  margin-top: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+  letter-spacing: 2px; color: var(--texto-mono);
+}
+.chamar-lista { display: flex; flex-wrap: wrap; gap: 8px; }
+.chamar-vazio { color: var(--texto-mono); font-size: 13px; }
+.chamar-chip {
+  display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 999px;
+  background: linear-gradient(180deg,#1c1e25,#131419); border: 1px solid var(--borda);
+  color: var(--texto-claro); font-family: inherit; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: transform .12s, background .12s;
+}
+.chamar-chip:active { background: #23252c; }
+.chamar-chip .chamar-sino { font-size: 14px; filter: grayscale(.4); }
+.chamar-chip.reconectando { opacity: .55; border-style: dashed; }
+.chamar-chip.tocado { animation: sinoTocado .5s ease-in-out; }
+@keyframes sinoTocado { 0%,100% { transform: scale(1); } 30% { transform: scale(1.12) rotate(-12deg); } 60% { transform: scale(1.12) rotate(12deg); } }
+
 /* -------------------- CHAT -------------------- */
 #painel-chat { display: none; }
 #painel-chat.ativo { display: flex; flex-direction: column; gap: 12px;
@@ -347,7 +366,18 @@ html, body {
 .msg .autor { display: block; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 1px; opacity: .75; margin-bottom: 3px; }
 .msg.minha { align-self: flex-end; background: linear-gradient(180deg,#2b62d6,#2450b8); color: #fff; }
 .msg.deles { align-self: flex-start; background: #1c1e25; border: 1px solid #2a2c33; }
-.msg-imagem { display: block; max-width: 100%; max-height: 220px; border-radius: 8px; margin-top: 4px; }
+.msg-imagem { display: block; max-width: 100%; max-height: 220px; border-radius: 8px; margin-top: 4px; cursor: zoom-in; }
+
+/* Foto ampliada (lightbox) — cobre a tela toda, fecha ao tocar/Esc/X */
+.lightbox {
+  position: fixed; inset: 0; z-index: 2000; display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,.92); padding: 16px; cursor: zoom-out;
+}
+.lightbox img { max-width: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 8px 40px rgba(0,0,0,.6); }
+.lightbox-fechar {
+  position: fixed; top: 14px; right: 16px; width: 42px; height: 42px; font-size: 20px;
+  color: #fff; background: rgba(255,255,255,.14); border: none; border-radius: 50%; cursor: pointer;
+}
 .msg-audio { display: block; width: 100%; max-width: 240px; margin-top: 4px; height: 32px; }
 
 .chat-rapidas { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -449,6 +479,7 @@ html, body {
   .btn-geral { padding: 8px 12px; }
   .btn-geral .geral-nome { font-size: 13px; }
   .btn-geral .geral-status { font-size: 10px; padding: 4px 10px; }
+  .chamar-chip { padding: 6px 10px; font-size: 11px; }
 
   /* CHAT: a caixa de mensagens tinha altura minima enorme (300px) que
      empurrava o campo de escrever pra fora da tela — o principal motivo

@@ -18,8 +18,13 @@ echo ============================================================ >> servidor.lo
 echo Iniciado em %date% %time% >> servidor.log
 echo ============================================================ >> servidor.log
 
-echo Reativando o link de acesso remoto (Tailscale Funnel)... >> servidor.log
-powershell -NoProfile -ExecutionPolicy Bypass -File "c:\Users\Pc\Downloads\Repo-UI\reativar-funnel.ps1" >> servidor.log 2>&1
+REM O link remoto (Tailscale Funnel) e' so' para acesso de FORA da rede da
+REM igreja. Roda em segundo plano, sem bloquear o servidor local — antes,
+REM se o Tailscale estivesse com problema, o servidor demorava ate 2 minutos
+REM (ou nem subia) so' esperando o Funnel, mesmo o acesso local nao precisando
+REM disso.
+echo Reativando o link de acesso remoto (Tailscale Funnel) em segundo plano... >> servidor.log
+start "" /min powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -Command "& 'c:\Users\Pc\Downloads\Repo-UI\reativar-funnel.ps1' *> 'c:\Users\Pc\Downloads\Repo-UI\funnel.log'"
 
 echo Iniciando o servidor do Mix de Fone... >> servidor.log
 node server\index.js >> servidor.log 2>&1

@@ -153,9 +153,9 @@ export const config = {
   muteGeral: [
     { id: 0,  nome: 'Guitarra' },
     { id: 1,  nome: 'Baixo' },
-    { id: 17, nome: 'Violao' },                  // canal "CORINGA" na mesa
-    { id: 9,  nome: 'Teclado 1', parceiro: 10 }, // estereo (CH10+11)
-    { id: 11, nome: 'Teclado 2' },               // CH12, mono
+    { id: 17, nome: 'Coringa' },                  // canal "CORINGA" na mesa (violao)
+    { id: 9,  nome: 'Teclado 1', parceiro: 10 },  // estereo (CH10+11)
+    { id: 11, nome: 'Teclado 2 ou Violão' },      // CH12, mono
   ],
 
   // --------------------------------------------------------------------------
