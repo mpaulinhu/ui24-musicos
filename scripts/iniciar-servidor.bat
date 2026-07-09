@@ -14,7 +14,7 @@ cd /d "c:\Users\Pc\Downloads\Repo-UI"
 title Mix de Fone - Servidor (nao feche esta janela)
 
 echo Reativando o link de acesso remoto (Tailscale Funnel)...
-powershell -NoProfile -ExecutionPolicy Bypass -File "c:\Users\Pc\Downloads\Repo-UI\reativar-funnel.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "c:\Users\Pc\Downloads\Repo-UI\scripts\reativar-funnel.ps1"
 echo.
 
 echo Iniciando o servidor do Mix de Fone...
