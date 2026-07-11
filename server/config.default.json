@@ -1,0 +1,28 @@
+{
+  "_comentario": "MODELO. Na primeira execucao, o servidor copia este arquivo para config.json (que NAO vai para o Git). Edite pela tela /admin ou direto no config.json. Troque as senhas!",
+  "mesa": { "host": "192.168.1.100", "port": 80 },
+  "servidor": { "port": 3000 },
+  "totalCanais": 24,
+  "totalAuxes": 10,
+  "canais": [
+    { "id": 0, "nome": "Voz 1" },
+    { "id": 1, "nome": "Voz 2" },
+    { "id": 2, "nome": "Violao" },
+    { "id": 3, "nome": "Guitarra" },
+    { "id": 4, "nome": "Baixo" },
+    { "id": 5, "nome": "Teclado L", "parceiro": 6 },
+    { "id": 6, "nome": "Teclado R", "parceiro": 5 },
+    { "id": 7, "nome": "Bateria" }
+  ],
+  "musicos": [
+    { "id": "musico1", "nome": "Musico 1", "senha": "1111", "aux": 0, "canais": "todos" },
+    { "id": "musico2", "nome": "Musico 2", "senha": "2222", "aux": 1, "canais": "todos" }
+  ],
+  "muteGeral": [
+    { "id": 2, "nome": "Violao" },
+    { "id": 3, "nome": "Guitarra" },
+    { "id": 4, "nome": "Baixo" }
+  ],
+  "houseMix": { "senha": "troque-esta-senha" },
+  "admin": { "senha": "troque-esta-senha" }
+}

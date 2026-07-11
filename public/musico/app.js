@@ -205,6 +205,7 @@ function tratar(msg) {
     case 'chat': receberChat(msg); break;
     case 'chamar_atencao': chamarAtencao(msg.de); break;
     case 'presenca': montarListaChamar(msg.online || []); break;
+    case 'config_mudou': location.reload(); break; // admin salvou nova config
   }
 }
 

@@ -66,6 +66,9 @@ function tratar(msg) {
     case 'presenca':
       mostrarPresenca(msg.online || []);
       break;
+    case 'config_mudou':
+      location.reload(); // admin salvou nova config
+      break;
   }
 }
 

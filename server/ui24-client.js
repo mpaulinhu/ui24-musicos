@@ -161,6 +161,27 @@ export class Ui24Client extends EventEmitter {
     });
   }
 
+  /**
+   * Troca o IP/porta da mesa em tempo de execucao (usado pela tela admin).
+   * Fecha a conexao atual; o handler de 'close' reconecta ja usando os novos
+   * valores. Retorna true se algo mudou de fato.
+   */
+  reconfigurar(host, port) {
+    port = Number(port);
+    if (host === this.host && port === this.port) return false;
+    this.host = host;
+    this.port = port;
+    clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
+    try {
+      if (this.ws) this.ws.close();
+      else this.conectar();
+    } catch {
+      this.conectar();
+    }
+    return true;
+  }
+
   _agendarReconexao(motivo) {
     if (this.reconnectTimer) return;
     this.emit('log', `Reconectando com a mesa em 3s (motivo: ${motivo})`);

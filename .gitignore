@@ -12,3 +12,7 @@ _*.mjs
 
 # Referencia pessoal, nao faz parte do app
 Working/
+
+# Config da instalacao (IP/senhas/musicos proprios de cada igreja). O modelo
+# versionado e o config.default.json; o config.json real fica so' local.
+server/config.json

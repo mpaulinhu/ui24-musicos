@@ -1,172 +1,131 @@
 // ============================================================================
-//  CONFIGURACAO GERAL  -  edite este arquivo para adaptar a sua igreja
+//  CONFIGURACAO GERAL  -  agora vem de config.json (dados), nao de codigo.
 // ============================================================================
 //
-//  Aqui voce define:
-//    1) O IP da sua mesa Ui24R (ou o simulador)
-//    2) A porta do SEU servidor (a que os musicos vao acessar)
-//    3) Quantos canais existem na mesa
-//    4) Os musicos, o aux (fone) de cada um e quais canais ele controla
+//  A configuracao (mesa, musicos, canais, senhas) fica em config.json e pode
+//  ser editada pela TELA ADMIN (/admin) sem mexer em codigo nem reiniciar o
+//  servidor. Este modulo:
+//    1) Carrega config.json na inicializacao.
+//    2) "Resolve" a config crua (ex: expande musico.canais = "todos" para a
+//       lista completa de canais) no objeto `config` que o resto do app usa.
+//    3) Salva/aplica alteracoes ao vivo (salvarConfig), mutando o MESMO objeto
+//       `config` em memoria — por isso quem fez `import { config }` ve a mudanca.
 //
-//  Depois de editar, basta reiniciar o servidor (npm start).
+//  Formato de config.json: ver o proprio arquivo. Campos principais:
+//    mesa {host, port}, servidor {port}, canais[], musicos[], muteGeral[],
+//    houseMix {senha}, admin {senha}.
+//    - musico.canais: "todos" (usa todos os canais) OU uma lista de ids.
 // ============================================================================
 
-// ----------------------------------------------------------------------------
-//  LISTA DE CANAIS DA MESA (mapeada dos rotulos reais da Ui24R)
-//  CH da mesa - 1 = id aqui. Todos os fones usam esta mesma lista.
-//  Se quiser que um musico veja MENOS canais, e so criar uma lista propria
-//  para ele em vez de usar 'canaisTodos'.
-//
-//  "parceiro": para canais que sao um PAR ESTEREO (ex: microfone/overhead em
-//  L+R), aponta para o id do outro lado do par. A interface do musico move os
-//  dois faders juntos quando o musico mexe em qualquer um dos dois.
-//
-//  "tipo"/"canalMesa": canais especiais que NAO fazem parte da numeracao
-//  normal 1-24 da mesa (ex: Line In). "id" e' so o identificador interno
-//  (usado pela interface/protocolo do app); "canalMesa" e' o indice REAL na
-//  mesa dentro do seu proprio "tipo". Se omitidos, tipo="i" e canalMesa=id
-//  (comportamento padrao dos canais normais abaixo).
-// ----------------------------------------------------------------------------
-const canaisTodos = [
-  { id: 0,  nome: 'Guitarra' },                    // CH 1
-  { id: 1,  nome: 'Baixo' },                       // CH 2
-  { id: 2,  nome: 'Talk' },                        // CH 3
-  { id: 3,  nome: 'Pratos L', parceiro: 4 },       // CH 4  (estereo com CH 5)
-  { id: 4,  nome: 'Pratos R', parceiro: 3 },       // CH 5  (estereo com CH 4)
-  { id: 5,  nome: 'Caixa' },                       // CH 6
-  { id: 6,  nome: 'Bumbo' },                       // CH 7
-  { id: 7,  nome: 'Tom' },                         // CH 8
-  { id: 8,  nome: 'Surdo' },                       // CH 9
-  { id: 9,  nome: 'Teclado 1', parceiro: 10 },     // CH 10 (estereo com CH 11)
-  { id: 10, nome: 'Teclado 2', parceiro: 9 },      // CH 11 (estereo com CH 10)
-  { id: 11, nome: 'Teclado 3' },                   // CH 12 (mono, independente)
-  { id: 12, nome: 'Azul' },                        // CH 13
-  { id: 13, nome: 'Verde' },                       // CH 14
-  { id: 14, nome: 'Amarelo' },                     // CH 15
-  { id: 15, nome: 'Vermelho' },                    // CH 16
-  { id: 16, nome: 'Branco' },                      // CH 17
-  { id: 17, nome: 'Coringa' },                     // CH 18
-  { id: 18, nome: 'Condensador L', parceiro: 19 }, // CH 19 (estereo com CH 20)
-  { id: 19, nome: 'Condensador R', parceiro: 18 }, // CH 20 (estereo com CH 19)
-  // Line In (entrada RCA do PC) — nao faz parte dos 24 canais normais da
-  // mesa; usa o tipo "l" (l.0/l.1 no protocolo), ja estereo.
-  { id: 20, nome: 'Line In L', tipo: 'l', canalMesa: 0, parceiro: 21 },
-  { id: 21, nome: 'Line In R', tipo: 'l', canalMesa: 1, parceiro: 20 },
-];
+import { readFileSync, writeFileSync, existsSync, copyFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 
-export const config = {
-  // --------------------------------------------------------------------------
-  //  CONEXAO COM A MESA
-  // --------------------------------------------------------------------------
-  //  IP e porta da Ui24R na rede da igreja.
-  //  - Para testar em casa com o SIMULADOR, use: host '127.0.0.1', porta 8001
-  //  - Na igreja, troque para o IP real da mesa e porta 80.
-  mesa: {
-    host: '192.168.100.201', // <-- TROCAR pelo IP da mesa na igreja (ex: '192.168.1.100')
-    port: 80,        // <-- Na igreja normalmente e 80
-  },
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ARQ = path.join(__dirname, 'config.json');
+const ARQ_MODELO = path.join(__dirname, 'config.default.json');
 
-  // --------------------------------------------------------------------------
-  //  SERVIDOR (o SEU) - a porta que os musicos vao abrir no navegador
-  // --------------------------------------------------------------------------
-  //  Ex: se o PC da igreja tem IP 192.168.1.50, os musicos acessam:
-  //      http://192.168.1.50:3000/musico
-  servidor: {
-    port: 3000,
-  },
+// config.json NAO vai para o Git (cada instalacao tem a sua, com senhas/IP
+// proprios). Na primeira execucao (clone novo), criamos a partir do modelo.
+if (!existsSync(ARQ)) copyFileSync(ARQ_MODELO, ARQ);
 
-  // --------------------------------------------------------------------------
-  //  QUANTIDADE DE CANAIS DE ENTRADA DA MESA
-  // --------------------------------------------------------------------------
-  //  A Ui24R tem 24 canais de entrada (indices 0..23 no protocolo).
-  totalCanais: 24,
+// Config CRUA (como esta no JSON) — usada pela tela admin para editar.
+let configRaw = lerArquivo();
 
-  // --------------------------------------------------------------------------
-  //  AUXES / VIAS DE FONE
-  // --------------------------------------------------------------------------
-  //  A Ui24R tem 10 saidas aux (indices 0..9 no protocolo).
-  //  Cada musico usa um aux como fone individual.
-  totalAuxes: 10,
+// Config RESOLVIDA (o que o resto do app consome). Mesmo objeto para sempre:
+// nunca reatribuimos, so' mutamos o conteudo (para os imports verem a mudanca).
+export const config = {};
+aplicarNoObjeto(resolver(configRaw));
 
-  // --------------------------------------------------------------------------
-  //  MUSICOS
-  // --------------------------------------------------------------------------
-  //  Cada musico tem:
-  //    - id:     usado internamente (sem espacos)
-  //    - nome:   aparece na tela
-  //    - senha:  login simples para o musico entrar (pode repetir se quiser)
-  //    - aux:    qual saida aux (0..9) e o fone DELE
-  //    - canais: lista de canais que ele pode controlar no fone dele (sem
-  //              limite fixo). Cada canal tem o indice na mesa (id) e um
-  //              nome amigavel.
-  //
-  //  IMPORTANTE: os indices de canal comecam em 0.
-  //    Canal 1 da mesa = id 0, Canal 2 = id 1, ... Canal 24 = id 23.
-  // --------------------------------------------------------------------------
-  musicos: [
-    {
-      id: 'baterista',
-      nome: 'Baterista',
-      senha: '1111',
-      aux: 8, // fone BATERISTA (estereo 8+9 -> usa o indice da esquerda: 8)
-      auxParceiro: 9, // outro lado do par estereo (so' para mostrar na tela de login)
-      canais: canaisTodos,
-    },
-    {
-      id: 'guivio',
-      nome: 'Guitarra / Baixo',
-      senha: '2222',
-      aux: 5, // fone GUI/VIO (estereo 5+6 -> usa 5)
-      auxParceiro: 6,
-      canais: canaisTodos,
-    },
-    {
-      id: 'teclado',
-      nome: 'Teclado',
-      senha: '3333',
-      aux: 2, // fone TECLADO (estereo 2+3 -> usa 2)
-      auxParceiro: 3,
-      canais: canaisTodos,
-    },
-    {
-      id: 'teclado2',
-      nome: 'Tec/Vio',
-      senha: '4444',
-      aux: 4, // fone TECLADO 2 (mono, sem parceiro)
-      canais: canaisTodos,
-    },
-  ],
+// ---------------------------------------------------------------------------
 
-  // --------------------------------------------------------------------------
-  //  MUTE GERAL (aba "GERAL") — botoes que mutam o canal por INTEIRO: em
-  //  TODOS os fones + no som principal (PA) da igreja. Diferente do mute
-  //  normal (que so tira do fone de UM musico). TODOS os musicos veem e
-  //  podem usar esses 5, independente do instrumento que cada um toca —
-  //  serve para o musico se tirar sozinho quando nao esta tocando, sem
-  //  precisar chamar o operador da mesa.
-  //
-  //  ATENCAO: a numeracao "Teclado 1/2" aqui e' por INSTRUMENTO (Teclado 1 =
-  //  o teclado estereo, Teclado 2 = o segundo teclado, mono) e NAO bate com
-  //  os nomes "Teclado 1/2/3" da lista de canais acima (que numeram por
-  //  CANAL da mesa). Teclado 1 (aqui) = CH10+11. Teclado 2 (aqui) = CH12.
-  // --------------------------------------------------------------------------
-  muteGeral: [
-    { id: 0,  nome: 'Guitarra' },
-    { id: 1,  nome: 'Baixo' },
-    { id: 17, nome: 'Coringa' },                  // canal "CORINGA" na mesa (violao)
-    { id: 9,  nome: 'Teclado 1', parceiro: 10 },  // estereo (CH10+11)
-    { id: 11, nome: 'Teclado 2 ou Violão' },      // CH12, mono
-  ],
+function lerArquivo() {
+  return JSON.parse(readFileSync(ARQ, 'utf8'));
+}
 
-  // --------------------------------------------------------------------------
-  //  SENHA DA HOUSE MIX (tela de monitor / operador)
-  // --------------------------------------------------------------------------
-  houseMix: {
-    senha: 'housemix',
-  },
-};
+// Transforma a config crua na resolvida: principalmente expande o campo
+// "canais" de cada musico ("todos" -> lista completa; ou lista de ids -> filtra).
+function resolver(raw) {
+  const canais = (raw.canais || []).map((c) => ({ ...c }));
+  const porId = new Map(canais.map((c) => [c.id, c]));
 
-// Helper: encontra um musico pelo id
+  const musicos = (raw.musicos || []).map((m) => {
+    let lista;
+    if (m.canais === 'todos' || m.canais == null) {
+      lista = canais;
+    } else if (Array.isArray(m.canais)) {
+      lista = m.canais.map((id) => porId.get(id)).filter(Boolean);
+    } else {
+      lista = canais;
+    }
+    return { ...m, canais: lista };
+  });
+
+  return {
+    mesa: { ...raw.mesa },
+    servidor: { ...raw.servidor },
+    totalCanais: raw.totalCanais,
+    totalAuxes: raw.totalAuxes,
+    canais,
+    musicos,
+    muteGeral: (raw.muteGeral || []).map((c) => ({ ...c })),
+    houseMix: { ...raw.houseMix },
+    admin: { ...raw.admin },
+  };
+}
+
+// Muta o objeto `config` EM MEMORIA (sem reatribuir) para preservar os imports.
+function aplicarNoObjeto(resolvido) {
+  for (const k of Object.keys(config)) delete config[k];
+  Object.assign(config, resolvido);
+}
+
+// Validacao minima da config crua (evita salvar algo que quebre o servidor).
+function validar(raw) {
+  if (!raw || typeof raw !== 'object') throw new Error('Configuracao invalida.');
+  if (!raw.mesa || typeof raw.mesa.host !== 'string' || !raw.mesa.host.trim())
+    throw new Error('IP da mesa (mesa.host) e obrigatorio.');
+  if (!Number.isFinite(Number(raw.mesa.port))) throw new Error('Porta da mesa invalida.');
+  if (!Array.isArray(raw.canais)) throw new Error('Lista de canais invalida.');
+  if (!Array.isArray(raw.musicos)) throw new Error('Lista de musicos invalida.');
+  const ids = new Set();
+  for (const m of raw.musicos) {
+    if (!m.id || !String(m.id).trim()) throw new Error('Todo musico precisa de um id.');
+    if (ids.has(m.id)) throw new Error(`Musico com id repetido: ${m.id}`);
+    ids.add(m.id);
+    if (!Number.isFinite(Number(m.aux))) throw new Error(`Aux invalido no musico ${m.id}.`);
+  }
+  if (!raw.houseMix || !String(raw.houseMix.senha ?? '')) throw new Error('Senha da House Mix obrigatoria.');
+  if (!raw.admin || !String(raw.admin.senha ?? '')) throw new Error('Senha de admin obrigatoria.');
+}
+
+// ---- API publica -----------------------------------------------------------
+
+/** Config crua (para a tela admin editar). Copia, para nao vazar referencia. */
+export function lerConfigRaw() {
+  return JSON.parse(JSON.stringify(configRaw));
+}
+
+/**
+ * Valida, grava em disco e aplica ao vivo uma nova config crua.
+ * Muta o objeto `config` em memoria. NAO cuida de efeitos colaterais
+ * (reconectar na mesa, remontar mapas do index.js) — quem chama faz isso.
+ * @returns {{mesaMudou:boolean}}
+ */
+export function salvarConfig(novoRaw) {
+  validar(novoRaw);
+  const mesaMudou =
+    novoRaw.mesa.host !== configRaw.mesa.host ||
+    Number(novoRaw.mesa.port) !== Number(configRaw.mesa.port);
+  // normaliza numeros
+  novoRaw.mesa.port = Number(novoRaw.mesa.port);
+  writeFileSync(ARQ, JSON.stringify(novoRaw, null, 2), 'utf8');
+  configRaw = novoRaw;
+  aplicarNoObjeto(resolver(novoRaw));
+  return { mesaMudou };
+}
+
+/** Encontra um musico pelo id. */
 export function acharMusico(id) {
   return config.musicos.find((m) => m.id === id) || null;
 }

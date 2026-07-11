@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { WebSocketServer } from 'ws';
 
-import { config, acharMusico } from './config.js';
+import { config, acharMusico, lerConfigRaw, salvarConfig } from './config.js';
 import { Ui24Client } from './ui24-client.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -40,14 +40,24 @@ const mesa = new Ui24Client({
 // especiais (ex: Line In, tipo "l") tem um indice na mesa diferente do "id"
 // que usamos internamente. Construido a partir de TODOS os musicos, entao
 // funciona mesmo que cada um customize sua propria lista de canais.
-const canalPorIndiceMesa = new Map();
-for (const m of config.musicos) {
-  for (const c of m.canais) {
-    const tipo = c.tipo || 'i';
-    const canalMesa = c.canalMesa != null ? c.canalMesa : c.id;
-    canalPorIndiceMesa.set(`${tipo}:${canalMesa}`, c.id);
+// Mapas derivados da config. Sao reconstruidos quando a tela admin salva uma
+// nova config (reconstruirDerivados), por isso 'let' e nao 'const'.
+let canalPorIndiceMesa = new Map();
+let muteGeralPorId = new Map();
+
+function reconstruirDerivados() {
+  canalPorIndiceMesa = new Map();
+  for (const m of config.musicos) {
+    for (const c of m.canais) {
+      const tipo = c.tipo || 'i';
+      const canalMesa = c.canalMesa != null ? c.canalMesa : c.id;
+      canalPorIndiceMesa.set(`${tipo}:${canalMesa}`, c.id);
+    }
   }
+  muteGeralPorId = new Map(config.muteGeral.map((c) => [c.id, c]));
 }
+reconstruirDerivados();
+
 // Devolve { canalMesa, tipo } para escrever/ler na mesa, a partir do "id" do config.
 function resolverCanal(canalCfg) {
   return {
@@ -55,9 +65,6 @@ function resolverCanal(canalCfg) {
     tipo: canalCfg.tipo || 'i',
   };
 }
-
-// Canais do MUTE GERAL (aba "GERAL"), indexados por id, para consulta rapida.
-const muteGeralPorId = new Map(config.muteGeral.map((c) => [c.id, c]));
 
 let mesaConectada = false;
 
@@ -214,13 +221,49 @@ const httpServer = http.createServer(async (req, res) => {
     // Rotas amigaveis
     if (url === '/' || url === '') url = '/musico/index.html';
     if (url === '/musico' || url === '/musico/') url = '/musico/index.html';
+    // Atalho: /musicos (plural) abre a mesma tela do musico. Mantemos /musico
+    // funcionando tambem, pra nao quebrar links/PWAs ja instalados nos celulares.
+    if (url === '/musicos' || url === '/musicos/') url = '/musico/index.html';
     if (url === '/monitor' || url === '/monitor/') url = '/monitor/index.html';
     if (url === '/espiao' || url === '/espiao/') url = '/espiao/index.html';
+    if (url === '/admin' || url === '/admin/') url = '/admin/index.html';
 
     // Endpoint que entrega a config publica (sem senhas) para o front montar a tela
     if (url === '/api/config') {
       res.writeHead(200, { 'Content-Type': MIME['.json'] });
       res.end(JSON.stringify(configPublica()));
+      return;
+    }
+
+    // ----- API da TELA ADMIN (protegida por senha) -----
+    //  POST /api/admin/get   { senha }            -> devolve a config crua
+    //  POST /api/admin/save  { senha, config }    -> valida, salva e aplica ao vivo
+    if (url === '/api/admin/get' || url === '/api/admin/save') {
+      if (req.method !== 'POST') { res.writeHead(405); res.end('Metodo invalido'); return; }
+      const corpo = await lerCorpoJson(req);
+      if (!corpo || String(corpo.senha ?? '') !== String(config.admin.senha)) {
+        res.writeHead(401, { 'Content-Type': MIME['.json'] });
+        res.end(JSON.stringify({ ok: false, erro: 'Senha de admin invalida.' }));
+        return;
+      }
+      if (url === '/api/admin/get') {
+        res.writeHead(200, { 'Content-Type': MIME['.json'] });
+        res.end(JSON.stringify({ ok: true, config: lerConfigRaw() }));
+        return;
+      }
+      // salvar
+      try {
+        const { mesaMudou } = salvarConfig(corpo.config);
+        reconstruirDerivados();
+        if (mesaMudou) mesa.reconfigurar(config.mesa.host, config.mesa.port);
+        // Avisa as telas conectadas (musico/monitor) para recarregarem com a config nova.
+        transmitir({ tipo: 'config_mudou' });
+        res.writeHead(200, { 'Content-Type': MIME['.json'] });
+        res.end(JSON.stringify({ ok: true, mesaMudou }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': MIME['.json'] });
+        res.end(JSON.stringify({ ok: false, erro: e.message }));
+      }
       return;
     }
 
@@ -248,6 +291,23 @@ const httpServer = http.createServer(async (req, res) => {
     res.end('Nao encontrado');
   }
 });
+
+// Le o corpo de um POST e faz o parse como JSON (limite de tamanho generoso
+// para caber a config inteira). Devolve null se algo der errado.
+function lerCorpoJson(req) {
+  return new Promise((resolve) => {
+    let dados = '';
+    let tamanho = 0;
+    const LIMITE = 2 * 1024 * 1024;
+    req.on('data', (parte) => {
+      tamanho += parte.length;
+      if (tamanho > LIMITE) { req.destroy(); resolve(null); return; }
+      dados += parte;
+    });
+    req.on('end', () => { try { resolve(JSON.parse(dados)); } catch { resolve(null); } });
+    req.on('error', () => resolve(null));
+  });
+}
 
 // Config sem dados sensiveis, para o navegador montar as telas.
 function configPublica() {

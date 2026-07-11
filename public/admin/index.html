@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#08090b" />
+  <title>Admin — Mix de Fone</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/admin/style.css" />
+</head>
+<body>
+  <!-- ===================== LOGIN ===================== -->
+  <section id="tela-login" class="tela ativa">
+    <div class="login-box">
+      <span class="eyebrow">MIX DE FONE · PAINEL</span>
+      <h1>Admin</h1>
+      <p class="subtitulo">Configuração da mesa, músicos e canais</p>
+      <label class="campo">
+        <span>SENHA DE ADMIN</span>
+        <input id="inp-senha" type="password" placeholder="senha" autocomplete="off" />
+      </label>
+      <button id="btn-entrar" class="btn-primario">ENTRAR</button>
+      <p id="login-erro" class="erro"></p>
+    </div>
+  </section>
+
+  <!-- ===================== PAINEL ===================== -->
+  <section id="tela-admin" class="tela">
+    <header class="topo">
+      <div class="topo-titulo">
+        <span class="eyebrow">MIX DE FONE · PAINEL</span>
+        <strong>Configuração</strong>
+      </div>
+      <div class="topo-acoes">
+        <button id="btn-salvar" class="btn-primario">SALVAR E APLICAR</button>
+      </div>
+    </header>
+
+    <main class="conteudo">
+      <!-- MESA -->
+      <section class="cartao">
+        <h2>Mesa (mixer)</h2>
+        <p class="ajuda">IP e porta da mesa na rede. Ao salvar com um IP novo, o servidor reconecta sozinho.</p>
+        <div class="grade2">
+          <label class="campo"><span>IP DA MESA</span><input id="mesa-host" type="text" placeholder="192.168.0.100" /></label>
+          <label class="campo"><span>PORTA</span><input id="mesa-port" type="number" placeholder="80" /></label>
+        </div>
+        <p class="ajuda mono">Porta do servidor (onde os músicos acessam): <strong id="srv-port">3000</strong> — para mudar, precisa reiniciar o servidor.</p>
+      </section>
+
+      <!-- SENHAS -->
+      <section class="cartao">
+        <h2>Senhas</h2>
+        <div class="grade2">
+          <label class="campo"><span>HOUSE MIX (tela /monitor)</span><input id="senha-house" type="text" /></label>
+          <label class="campo"><span>ADMIN (esta tela)</span><input id="senha-admin" type="text" /></label>
+        </div>
+      </section>
+
+      <!-- MUSICOS -->
+      <section class="cartao">
+        <div class="cartao-cab">
+          <h2>Músicos</h2>
+          <button class="btn-add" data-add="musico">+ músico</button>
+        </div>
+        <p class="ajuda">Cada músico entra com a senha dele e controla o fone do <strong>aux</strong> indicado (0–9). Se o fone for estéreo, informe o <strong>par</strong> (o outro lado).</p>
+        <div class="tabela-cab tabela-musico">
+          <span>NOME</span><span>SENHA</span><span>AUX</span><span>PAR (estéreo)</span><span></span>
+        </div>
+        <div id="lista-musicos"></div>
+      </section>
+
+      <!-- CANAIS -->
+      <section class="cartao">
+        <div class="cartao-cab">
+          <h2>Canais da mesa</h2>
+          <button class="btn-add" data-add="canal">+ canal</button>
+        </div>
+        <p class="ajuda">Nomes que aparecem para os músicos. <strong>Nº mesa</strong> é o canal na mesa menos 1 (Canal 1 = 0). <strong>Par</strong> = id do outro lado, para canais estéreo.</p>
+        <div class="tabela-cab tabela-canal">
+          <span>Nº MESA (id)</span><span>NOME</span><span>PAR (estéreo)</span><span></span>
+        </div>
+        <div id="lista-canais"></div>
+      </section>
+
+      <!-- MUTE GERAL -->
+      <section class="cartao">
+        <div class="cartao-cab">
+          <h2>Mute Geral (aba GERAL)</h2>
+          <button class="btn-add" data-add="mute">+ botão</button>
+        </div>
+        <p class="ajuda">Botões que tiram o instrumento de <strong>todos os fones</strong> e do som principal. <strong>Id</strong> é o mesmo id do canal acima.</p>
+        <div class="tabela-cab tabela-mute">
+          <span>NOME</span><span>id CANAL</span><span>PAR (estéreo)</span><span></span>
+        </div>
+        <div id="lista-mute"></div>
+      </section>
+
+      <div class="rodape-salvar">
+        <button id="btn-salvar-2" class="btn-primario">SALVAR E APLICAR</button>
+      </div>
+    </main>
+  </section>
+
+  <div id="aviso-toast" class="aviso-toast oculto"></div>
+  <script src="/admin/app.js"></script>
+</body>
+</html>
