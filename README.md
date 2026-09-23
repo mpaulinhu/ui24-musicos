@@ -300,6 +300,38 @@ computador — seção 4 — para acessar de outro aparelho na mesma rede):
 | Admin (configurar mesa/senhas/músicos/canais) | http://localhost:3000/admin |
 | Espião (mapear a mesa na instalação) | http://localhost:3000/espiao |
 
+### Senhas iniciais (só na primeira instalação, antes de configurar)
+
+Essas são as senhas do **modelo** (`server/config.default.json`), usadas só
+quando o `config.json` ainda não foi personalizado. **Troque todas assim que
+entrar no `/admin`** — é o primeiro passo depois de instalar.
+
+| Login | Usuário/instrumento | Senha padrão |
+|---|---|---|
+| Músico 1 | `Musico 1` | `1111` |
+| Músico 2 | `Musico 2` | `2222` |
+| Monitor / House Mix | (só senha) | `troque-esta-senha` |
+| Admin | (só senha) | `troque-esta-senha` |
+| Espião | (usa a mesma senha da House Mix) | `troque-esta-senha` |
+
+---
+
+## 11. Ligar o servidor sozinho com o Windows (opcional)
+
+Sem isso, é preciso dar duplo-clique no `LIGAR-SERVIDOR.bat` toda vez que o
+computador ligar. Para o servidor subir sozinho junto com o Windows:
+
+1. Aperte **Win + R**, digite `shell:startup` e aperte Enter — abre a pasta
+   de Inicialização do Windows.
+2. Na pasta do projeto, clique com o botão direito em **`LIGAR-SERVIDOR.bat`**
+   → **Criar atalho**.
+3. Arraste (ou copie/cole) esse atalho para dentro da pasta de Inicialização
+   que abriu no passo 1.
+
+Da próxima vez que o computador ligar, a janela do servidor abre sozinha
+(pode minimizar, mas não fechar — fechar a janela desliga o servidor para
+todo mundo).
+
 ---
 
 Feito para a House Mix. Qualquer ajuste (mais músicos, EQ, cores, logo da
