@@ -1,0 +1,145 @@
+====================================================================
+  MIX DE FONE (UI24) - RESUMO DO QUE MUDOU - 23/09/2026
+====================================================================
+
+O QUE ERA ANTES
+----------------
+Para usar o projeto era preciso abrir terminal e rodar "npm install" /
+"npm start", e para configurar mesa/musicos/senhas era preciso editar
+um arquivo de codigo na mao. Inviavel para outra igreja que nao tenha
+alguem tecnico por perto no dia a dia.
+
+
+O QUE MUDOU
+------------
+Agora tem dois arquivos novos na pasta principal do projeto, para
+duplo-clique (sem terminal, sem editar codigo):
+
+  1) PRIMEIRA-VEZ.bat
+     - Usar SO UMA VEZ, na primeira vez que o projeto for usado num
+       computador novo.
+     - Ele confere se o Node.js esta instalado (avisa como instalar
+       se nao estiver), instala o que o projeto precisa, e ja liga o
+       servidor no final.
+
+  2) LIGAR-SERVIDOR.bat
+     - Usar em TODAS AS VEZES SEGUINTES (depois de já ter rodado o
+       PRIMEIRA-VEZ.bat uma vez).
+     - So liga o servidor. Mostra os links das telas na propria
+       janela assim que sobe.
+
+  IMPORTANTE: a janela preta que abre com esses arquivos precisa
+  ficar ligada enquanto o sistema estiver em uso (pode minimizar,
+  mas fechar a janela desliga o servidor para todo mundo).
+
+
+AS 4 TELAS DO SISTEMA
+-----------------------
+Sao 4 paginas diferentes, cada uma com seu proprio login/senha, mas
+todas no mesmo servidor (porta 3000):
+
+  /musico   -> cada musico usa no celular dele (faders + chat)
+  /monitor  -> fica numa tela grande, para a House Mix ver o chat
+  /admin    -> configurar TUDO (mesa, senhas, musicos, canais)
+  /espiao   -> so durante a instalacao, para descobrir os numeros
+               da mesa (qual canal e qual fone/aux de cada musico)
+
+
+LINKS DAS TELAS (com o servidor ligado)
+------------------------------------------
+No mesmo computador do servidor:
+
+  http://localhost:3000/musico
+  http://localhost:3000/monitor
+  http://localhost:3000/admin
+  http://localhost:3000/espiao
+
+Para os celulares dos musicos (ou outro computador) acessarem pelo
+Wi-Fi, troca "localhost" pelo IP do computador do servidor, por
+exemplo:
+
+  http://192.168.1.50:3000/musico
+
+(Para descobrir esse IP: no Windows, abrir o Prompt de Comando e
+digitar "ipconfig" - o numero fica em "Endereco IPv4".)
+
+
+SENHAS INICIAIS (so na primeira instalacao, antes de configurar)
+---------------------------------------------------------------------
+Essas sao as senhas do MODELO (server/config.default.json), usadas so
+quando o config.json ainda nao foi personalizado. TROCAR TUDO assim
+que entrar no /admin pela primeira vez.
+
+  Musico 1  (login "Musico 1")   -> senha: 1111
+  Musico 2  (login "Musico 2")   -> senha: 2222
+  Monitor / House Mix (so senha) -> senha: troque-esta-senha
+  Admin (so senha)                -> senha: troque-esta-senha
+  Espiao (usa a senha da House Mix acima)
+
+Se a SUA igreja ja tem uma instalacao configurada (config.json ja
+personalizado), essas senhas de cima NAO valem mais - valem as que
+voce ja cadastrou pela tela /admin. Esse resumo aqui e sobre o
+modelo/instalacao nova.
+
+
+LIGAR O SERVIDOR SOZINHO COM O WINDOWS (opcional, recomendado)
+---------------------------------------------------------------------
+Sem isso, e preciso dar duplo-clique no LIGAR-SERVIDOR.bat toda vez
+que o computador ligar. Para ligar sozinho:
+
+  1. Aperte Win + R, digite "shell:startup" e Enter
+     (abre a pasta de Inicializacao do Windows).
+  2. Na pasta do projeto, botao direito em LIGAR-SERVIDOR.bat
+     -> "Criar atalho".
+  3. Arraste (ou copie/cole) esse atalho para dentro da pasta de
+     Inicializacao que abriu no passo 1.
+
+Da proxima vez que o computador ligar, a janela do servidor abre
+sozinha (pode minimizar, mas nao fechar).
+
+
+A TELA /admin FAZ TUDO - SEM MEXER EM CODIGO
+------------------------------------------------
+Depois que o servidor esta ligado, TUDO que muda de uma instalacao
+para outra e feito pela tela /admin, sem editar nenhum arquivo:
+
+  - IP e porta da mesa (ao salvar, reconecta sozinho)
+  - Senha da House Mix e senha do Admin
+  - Cada musico: nome, senha, qual fone (aux) e' o dele
+  - Cada canal: numero na mesa e nome amigavel
+  - Mute Geral: quais canais aparecem no botao "GERAL"
+
+Basta clicar em "SALVAR E APLICAR" - nao precisa reiniciar nada.
+
+O UNICO cenario que ainda exigiria mexer em codigo e' se a mesa de
+outra igreja usar um protocolo diferente da que ja foi mapeada aqui
+(coisa de firmware diferente) - nesse caso e' so' me chamar.
+
+
+PARA OUTRA IGREJA INSTALAR DO ZERO (passo a passo simples)
+---------------------------------------------------------------
+  1. Baixar o projeto (ZIP do GitHub) e descompactar numa pasta.
+  2. Duplo-clique em PRIMEIRA-VEZ.bat.
+  3. Descobrir o IP da mesa Ui24R dela (Settings -> Network, na
+     propria mesa).
+  4. Abrir http://localhost:3000/admin, colocar o IP da mesa, e
+     TROCAR AS SENHAS PADRAO (vem com "troque-esta-senha").
+  5. Usar a tela /espiao para descobrir os numeros (canal/aux) da
+     mesa dela, mexendo um fader por vez na interface oficial da
+     mesa (o /espiao mostra e traduz ao vivo).
+  6. Voltar no /admin e preencher os musicos/canais reais.
+  7. Testar fader por fader.
+
+Tudo isso esta detalhado, com mais capricho, no arquivo README.md
+que fica na mesma pasta do projeto (e no docs/CONTEXTO.md, que tem
+mais detalhes tecnicos caso outra pessoa - ou uma IA - precise dar
+manutencao no projeto no futuro).
+
+
+TESTADO NESTA SESSAO
+-----------------------
+Rodei os dois .bat de verdade (nao so' olhei o codigo): confirmei
+que instalam certo, o servidor sobe, e as 4 telas respondem
+normalmente. No caminho, encontrei e corrigi um bug real do Windows
+(arquivo .bat com acentuacao quebrava o "cmd.exe" silenciosamente em
+certos casos) - ja esta resolvido e documentado.
