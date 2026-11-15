@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/musico/style.css?v=9" />
+  <link rel="stylesheet" href="/musico/style.css?v=13" />
 </head>
 <body>
   <!-- ===================== TELA DE LOGIN ===================== -->
@@ -113,6 +113,7 @@
       <!-- ---- PAINEL CHAT ---- -->
       <div id="painel-chat" class="painel">
         <div class="chat-info">Chat geral: todos os músicos e a House Mix veem estas mensagens.</div>
+        <div id="chat-digitando" class="chat-digitando" role="status" aria-live="polite" aria-atomic="true"></div>
         <div id="chat-mensagens" class="chat-mensagens"></div>
         <div class="chat-rapidas">
           <button class="rapida" data-msg="Pode aumentar minha voz no meu fone?">+ minha voz</button>
@@ -138,6 +139,7 @@
     </div>
   </section>
 
-  <script src="/musico/app.js?v=9"></script>
+  <script src="/shared/chat-digitando.js?v=1"></script>
+  <script src="/musico/app.js?v=13"></script>
 </body>
 </html>

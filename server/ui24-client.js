@@ -79,6 +79,10 @@ export class Ui24Client extends EventEmitter {
     return `${tipo}.${canal}.aux.${aux}.mute`;
   }
 
+  caminhoProcessamento(canal, aux, tipo = 'i') {
+    return `${tipo}.${canal}.aux.${aux}.postproc`;
+  }
+
   /** Caminho do NIVEL MASTER do proprio aux (volume geral do fone).
    *  Na Ui24R o fader do master do aux e' "a.<n>.mix" (o ".value" nao e' o
    *  fader real — era pra onde o app escrevia por engano). */
@@ -288,8 +292,8 @@ export class Ui24Client extends EventEmitter {
    * line), 1 byte de preenchimento, e depois um bloco de bytes por canal
    * (tamanho do bloco varia por tipo). Cada byte e' o nivel (0..255),
    * convertido para 0..1 multiplicando pelo fator abaixo.
-   * So extraimos UM numero por canal (o nivel "pos-processamento", 2o byte
-   * do bloco em canais mono) — o suficiente para animar um medidor de VU.
+   * Preserva os pontos antes/depois do processamento e depois do fader para
+   * calcular o nivel do envio ao aux conforme sua configuracao PRE/POST.
    */
   _decodificarVU(base64) {
     let bytes;
@@ -311,11 +315,15 @@ export class Ui24Client extends EventEmitter {
       { chave: 'line', qtd: bytes[6], tam: 6 },
     ];
 
-    const resultado = { input: [], player: [], sub: [], fx: [], aux: [], master: [], line: [] };
+    const resultado = {
+      input: [], player: [], sub: [], fx: [], aux: [], master: [], line: [],
+      pre: { input: [], player: [], line: [] },
+      posFader: { input: [], player: [], line: [] },
+    };
     let i = 8; // pula o cabecalho
     for (const tipo of tipos) {
       for (let n = 0; n < (tipo.qtd || 0); n++) {
-        if (i + 1 >= bytes.length) break;
+        if (i + tipo.tam > bytes.length) return null;
         let nivel;
         if (tipo.chave === 'fx' || tipo.chave === 'sub') {
           // estereo: bloco e' [postL, postR, ...] -> usamos o maior dos dois
@@ -323,11 +331,15 @@ export class Ui24Client extends EventEmitter {
         } else if (tipo.chave === 'input' || tipo.chave === 'player' || tipo.chave === 'line') {
           // bloco e' [vuPre, vuPost, vuPostFader, ...] -> byte 1 = vuPost
           nivel = bytes[i + 1] * NORMALIZA;
+          resultado.pre[tipo.chave].push(bytes[i] * NORMALIZA);
+          resultado.posFader[tipo.chave].push(bytes[i + 2] * NORMALIZA);
         } else {
           // aux/master: bloco e' [vuPost, vuPostFader, ...] -> byte 0 = vuPost
           nivel = bytes[i] * NORMALIZA;
         }
-        resultado[tipo.chave].push(Math.min(1, nivel));
+        // Nao corta picos antes de aplicar o ganho do envio: um sinal acima
+        // de 0 dBFS ainda pode estar abaixo disso na saida de um envio atenuado.
+        resultado[tipo.chave].push(nivel);
         i += tipo.tam;
       }
     }
@@ -376,6 +388,18 @@ export class Ui24Client extends EventEmitter {
     const par = this._auxParceiro(aux);
     if (par != null) this._aplicarSetD(this.caminhoMix(canal, par, tipo), muteValor, String(muteValor));
     return { caminho, valor: ligado ? 1 : 0 };
+  }
+
+  /** PRE PROC (0) desvia o processamento somente no envio ao fone. */
+  setSemProcessamentoCanalAux(canal, aux, semProcessamento, tipo = 'i') {
+    const valor = semProcessamento ? 0 : 1;
+    const auxes = [aux];
+    const par = this._auxParceiro(aux);
+    if (par != null) auxes.push(par);
+    for (const destino of auxes) {
+      this._aplicarSetD(this.caminhoProcessamento(canal, destino, tipo), valor, String(valor));
+    }
+    return { valor, auxes };
   }
 
   /** Caminho do MUTE GERAL de um canal (desliga em TODOS os fones + no som

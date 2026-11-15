@@ -39,7 +39,11 @@ function conectar() {
     // Reconectou: se ja estavamos logados, faz login de novo automaticamente.
     if (ultimaSenha != null) enviar({ tipo: 'login_housemix', senha: ultimaSenha });
   };
-  ws.onclose = () => setTimeout(conectar, 2000);
+  ws.onclose = () => {
+    autenticado = false;
+    chatDigitando.desconectar();
+    setTimeout(conectar, 2000);
+  };
   ws.onmessage = (ev) => {
     let msg; try { msg = JSON.parse(ev.data); } catch { return; }
     tratar(msg);
@@ -51,6 +55,7 @@ function tratar(msg) {
   switch (msg.tipo) {
     case 'login_ok':
       autenticado = true;
+      chatDigitando.retomar();
       if (ultimaSenha) salvarLogin(ultimaSenha);
       $('#tela-login').classList.remove('ativa');
       $('#tela-monitor').classList.add('ativa');
@@ -62,6 +67,9 @@ function tratar(msg) {
       break;
     case 'chat':
       mostrarMensagem(msg);
+      break;
+    case 'chat_digitando':
+      chatDigitando.atualizar(msg.pessoas || []);
       break;
     case 'presenca':
       mostrarPresenca(msg.online || []);
@@ -142,9 +150,15 @@ function mostrarPresenca(lista) {
 }
 
 // ---------------- RESPONDER ----------------
+const chatDigitando = new window.ChatDigitando(
+  $('#resp-input'), $('#chat-digitando'), enviar,
+  () => autenticado && ws?.readyState === WebSocket.OPEN
+);
+
 function responder(texto) {
   const t = (texto || '').trim();
   if (!t) return;
+  chatDigitando.parar();
   enviar({ tipo: 'chat_resposta', texto: t });
   $('#resp-input').value = '';
 }

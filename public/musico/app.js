@@ -159,6 +159,7 @@ function conectar() {
     if (ultimoLogin) enviar({ tipo: 'login_musico', ...ultimoLogin });
   };
   ws.onclose = () => {
+    chatDigitando.desconectar();
     setStatusMesa('Servidor desconectado. Tentando reconectar…');
     setTimeout(conectar, 2000);
   };
@@ -175,6 +176,7 @@ function tratar(msg) {
     case 'mesa_status': mesaConectada = msg.conectado; atualizarBadgeMesa(); setStatusMesa(); break;
     case 'login_ok':
       musico = msg.musico;
+      chatDigitando.retomar();
       if (ultimoLogin) salvarLogin(ultimoLogin); // renova a validade a cada login/reconexao
       entrarNoMixer();
       $('#chat-mensagens').innerHTML = '';
@@ -189,10 +191,11 @@ function tratar(msg) {
       mostrarTelaLogin();
       $('#login-erro').textContent = msg.motivo || 'Falha no login';
       break;
-    case 'estado_canal': aplicarNivel(msg.canal, msg.nivel); aplicarMix(msg.canal, msg.mix); break;
+    case 'estado_canal': aplicarNivel(msg.canal, msg.nivel); aplicarMix(msg.canal, msg.mix); aplicarProcessamento(msg.canal, msg.postproc); break;
     case 'parametro':
       if (msg.campo === 'value') aplicarNivel(msg.canal, msg.valor);
       if (msg.campo === 'mix') aplicarMix(msg.canal, msg.valor);
+      if (msg.campo === 'postproc') aplicarProcessamento(msg.canal, msg.valor);
       break;
     case 'master': aplicarMaster(msg.valor); break;
     case 'vu':
@@ -203,6 +206,7 @@ function tratar(msg) {
       break;
     case 'mute_geral': desenharMuteGeral(msg.canal, msg.mutado); break;
     case 'chat': receberChat(msg); break;
+    case 'chat_digitando': chatDigitando.atualizar(msg.pessoas || []); break;
     case 'chamar_atencao': chamarAtencao(msg.de); break;
     case 'presenca': montarListaChamar(msg.online || []); break;
     case 'config_mudou': location.reload(); break; // admin salvou nova config
@@ -282,6 +286,8 @@ $('#inp-senha').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#
 //  pagina, para outra pessoa entrar com o proprio usuario/senha.
 // ---------------------------------------------------------------------------
 $('#btn-trocar').addEventListener('click', () => {
+  chatDigitando.parar();
+  chatDigitando.atualizar([]);
   ultimoLogin = null;
   esquecerLogin();
   musico = null;
@@ -337,10 +343,11 @@ function criarCanal(canal, indice) {
     </div>
     <div class="canal-valor">50%</div>
     <div class="btn-on"><span class="led-btn"></span><span class="btn-label">ON</span></div>
+    <button type="button" class="btn-processamento" aria-pressed="false" title="Usa o sinal antes do processamento apenas no seu fone" disabled>Sem Gate e Comp</button>
   `;
 
   const ref = {
-    pct: 50, on: true, cor,
+    pct: 50, on: true, postproc: null, cor,
     band: box.querySelector('.canal-band'),
     fill: box.querySelector('.fader-fill'),
     cap: box.querySelector('.fader-cap'),
@@ -348,6 +355,7 @@ function criarCanal(canal, indice) {
     btn: box.querySelector('.btn-on'),
     ledBtn: box.querySelector('.led-btn'),
     btnLabel: box.querySelector('.btn-label'),
+    btnProcessamento: box.querySelector('.btn-processamento'),
     vuFill: box.querySelector('.vu-fill'),
     vuPeak: box.querySelector('.vu-peak'),
     faderTrack: box.querySelector('.fader'),
@@ -386,6 +394,17 @@ function criarCanal(canal, indice) {
       canais[canal.parceiro].on = ref.on;
       enviar({ tipo: 'set_mix', canal: canal.parceiro, ligado: ref.on });
       desenharBotao(canal.parceiro);
+    }
+  });
+
+  ref.btnProcessamento.addEventListener('click', () => {
+    if (ref.postproc == null) return;
+    const semProcessamento = ref.postproc !== 0;
+    aplicarProcessamento(canal.id, semProcessamento ? 0 : 1);
+    enviar({ tipo: 'set_processamento', canal: canal.id, semProcessamento });
+    if (canal.parceiro != null && canais[canal.parceiro]) {
+      aplicarProcessamento(canal.parceiro, semProcessamento ? 0 : 1);
+      enviar({ tipo: 'set_processamento', canal: canal.parceiro, semProcessamento });
     }
   });
 
@@ -443,6 +462,15 @@ function aplicarMix(id, mixValor) {
   const r = canais[id]; if (!r) return;
   r.on = Number(mixValor) !== 0; // 0 = mutado
   desenharBotao(id);
+}
+
+function aplicarProcessamento(id, valor) {
+  const ref = canais[id]; if (!ref) return;
+  const conhecido = valor != null && (Number(valor) === 0 || Number(valor) === 1);
+  ref.postproc = conhecido ? Number(valor) : null;
+  ref.btnProcessamento.disabled = !conhecido;
+  ref.btnProcessamento.classList.toggle('ativo', conhecido && ref.postproc === 0);
+  ref.btnProcessamento.setAttribute('aria-pressed', String(conhecido && ref.postproc === 0));
 }
 
 // ---------------------------------------------------------------------------
@@ -530,11 +558,20 @@ window.setNivelAudio = setNivelAudio;
 (function ligarGestosDosCanais() {
   const LIMIAR = 10; // px de movimento antes de decidir a direcao do gesto
   const cont = $('#faders');
-  let gesto = null; // { tipo:'pendente'|'vertical'|'horizontal', inicioX, inicioY, scrollInicial, faderTrack }
+  let gesto = null; // { pointerId, tipo:'pendente'|'vertical'|'horizontal', inicioX, inicioY, scrollInicial, faderTrack }
+
+  function cancelarGesto(e) {
+    if (e?.pointerId != null && gesto && e.pointerId !== gesto.pointerId) return;
+    gesto = null;
+    cont.classList.remove('arrastando');
+  }
 
   cont.addEventListener('pointerdown', (e) => {
-    if (e.target.closest('.btn-on')) return; // deixa o clique do MUTE em paz
+    if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    cancelarGesto();
+    if (e.target.closest('.btn-on, .btn-processamento')) return; // botoes nao iniciam arraste
     gesto = {
+      pointerId: e.pointerId,
       tipo: 'pendente',
       inicioX: e.clientX,
       inicioY: e.clientY,
@@ -544,7 +581,8 @@ window.setNivelAudio = setNivelAudio;
   });
 
   window.addEventListener('pointermove', (e) => {
-    if (!gesto) return;
+    if (!gesto || e.pointerId !== gesto.pointerId) return;
+    if (e.pointerType === 'mouse' && !(e.buttons & 1)) { cancelarGesto(); return; }
     const dx = e.clientX - gesto.inicioX;
     const dy = e.clientY - gesto.inicioY;
 
@@ -566,14 +604,17 @@ window.setNivelAudio = setNivelAudio;
   });
 
   window.addEventListener('pointerup', (e) => {
-    if (gesto && gesto.tipo === 'pendente' && gesto.faderTrack) {
+    if (!gesto || e.pointerId !== gesto.pointerId) return;
+    if (gesto.tipo === 'pendente' && gesto.faderTrack) {
       // toque/clique simples no fader (sem arrastar) -> aplica no ponto tocado
       const cb = faderCallbacks.get(gesto.faderTrack);
       if (cb) cb(calcularPctNoFader(gesto.faderTrack, e.clientY));
     }
-    gesto = null;
-    cont.classList.remove('arrastando');
+    cancelarGesto(e);
   });
+  window.addEventListener('pointercancel', cancelarGesto);
+  cont.addEventListener('lostpointercapture', cancelarGesto);
+  window.addEventListener('blur', () => cancelarGesto());
 })();
 
 // ---------------------------------------------------------------------------
@@ -663,9 +704,15 @@ function montarListaChamar(lista) {
 // ---------------------------------------------------------------------------
 //  CHAT
 // ---------------------------------------------------------------------------
+const chatDigitando = new window.ChatDigitando(
+  $('#chat-input'), $('#chat-digitando'), enviar,
+  () => !!musico && ws?.readyState === WebSocket.OPEN
+);
+
 function enviarChat(texto) {
   const t = (texto || '').trim();
   if (!t) return;
+  chatDigitando.parar();
   enviar({ tipo: 'chat', texto: t });
   $('#chat-input').value = '';
   $('#chat-input').dispatchEvent(new Event('input')); // volta o botao de acao pro icone de mic

@@ -22,6 +22,8 @@ import { WebSocketServer } from 'ws';
 
 import { config, acharMusico, lerConfigRaw, salvarConfig } from './config.js';
 import { Ui24Client } from './ui24-client.js';
+import { ChatDigitando } from './chat-digitando.js';
+import { nivelEnviadoAoAux } from './medidores.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
@@ -106,10 +108,12 @@ function traduzirComando(msg) {
 
   // Canal dentro de um aux (fone): i.<canal>.aux.<aux>.value|mute (entrada
   // normal) ou l.<canal>.aux.<aux>.value|mute (Line In, canais dedicados).
-  let m = /^(i|l)\.(\d+)\.aux\.(\d+)\.(value|mute)$/.exec(caminho);
+  let m = /^(i|l)\.(\d+)\.aux\.(\d+)\.(value|mute|postproc)$/.exec(caminho);
   if (m) {
     const tipo = m[1], canal = Number(m[2]), aux = Number(m[3]), campo = m[4];
-    const pct = campo === 'value' ? ` = ${Math.round(Number(valor) * 100)}%` : (Number(valor) === 0 ? ' = ligado' : ' = MUTADO');
+    const pct = campo === 'value' ? ` = ${Math.round(Number(valor) * 100)}%`
+      : campo === 'postproc' ? (Number(valor) === 0 ? ' = sem processamento' : ' = com processamento')
+      : (Number(valor) === 0 ? ' = ligado' : ' = MUTADO');
     const rotuloCanal = tipo === 'l' ? `Line In ${canal === 0 ? 'L' : 'R'}` : `Canal ${canal} (mesa: canal ${canal + 1})`;
     return `${rotuloCanal}  no  Aux ${aux} (mesa: fone ${aux + 1})  [${campo}]${pct}`;
   }
@@ -177,15 +181,13 @@ mesa.on('parametro', ({ caminho, valor }) => {
 
 // VU (medidor de audio ao vivo): a mesa manda o nivel de TODOS os canais
 // continuamente (~5x/seg). Para cada musico conectado, repassamos so os
-// niveis dos canais que ELE ve no fone dele.
+// niveis dos envios dos canais para o fone DELE (apos fader/mute do envio).
 mesa.on('vu', (dados) => {
   for (const cli of clientes) {
     if (cli.tipo !== 'musico' || !cli.autenticado) continue;
     const niveis = {};
     for (const c of cli.musico.canais) {
-      const { canalMesa, tipo } = resolverCanal(c);
-      const arr = tipo === 'l' ? dados.line : dados.input;
-      if (arr && arr[canalMesa] != null) niveis[c.id] = arr[canalMesa];
+      niveis[c.id] = nivelEnviadoAoAux(dados, mesa.estado, c, cli.musico.aux);
     }
     enviar(cli.ws, { tipo: 'vu', niveis });
   }
@@ -197,7 +199,7 @@ mesa.conectar();
 // ou "l.0.aux.8.mute" (Line In). Aceita os prefixos "i" (entrada normal) e
 // "l" (Line In estereo).
 function parseCaminho(caminho) {
-  const m = /^(i|l)\.(\d+)\.aux\.(\d+)\.(value|mute)$/.exec(caminho);
+  const m = /^(i|l)\.(\d+)\.aux\.(\d+)\.(value|mute|postproc)$/.exec(caminho);
   if (!m) return null;
   return { tipo: m[1], canalMesa: Number(m[2]), aux: Number(m[3]), campo: m[4] };
 }
@@ -334,6 +336,14 @@ const wss = new WebSocketServer({ server: httpServer, maxPayload: 8 * 1024 * 102
 
 // Lista de clientes conectados
 const clientes = new Set();
+const chatDigitando = new ChatDigitando(() => {
+  for (const cli of clientes) enviarDigitando(cli);
+});
+
+function enviarDigitando(cli) {
+  if (!cli.autenticado || !['musico', 'housemix'].includes(cli.tipo)) return;
+  enviar(cli.ws, { tipo: 'chat_digitando', pessoas: chatDigitando.pessoasPara(cli) });
+}
 
 // Presenca "com tolerancia": celular apaga a tela / rede oscila e o
 // WebSocket cai por alguns segundos o tempo todo — isso NAO deveria fazer o
@@ -371,6 +381,7 @@ wss.on('connection', (ws) => {
 
   ws.on('close', () => {
     clientes.delete(cli);
+    chatDigitando.parar(cli);
     if (cli.tipo === 'musico' && cli.musico) {
       const p = presencaMusicos.get(cli.musico.id);
       if (p) {
@@ -398,11 +409,13 @@ function tratarMensagem(cli, msg) {
         enviar(cli.ws, { tipo: 'login_falhou', motivo: 'Musico ou senha invalidos' });
         return;
       }
+      chatDigitando.parar(cli);
       cli.tipo = 'musico';
       cli.musico = m;
       cli.nome = m.nome;
       cli.autenticado = true;
       enviar(cli.ws, { tipo: 'login_ok', musico: { id: m.id, nome: m.nome, aux: m.aux, canais: m.canais } });
+      enviarDigitando(cli);
       // Manda o estado atual de cada canal do fone dele.
       enviarEstadoInicial(cli);
       // Manda o estado atual dos 5 botoes de mute geral (aba "GERAL").
@@ -430,10 +443,12 @@ function tratarMensagem(cli, msg) {
         enviar(cli.ws, { tipo: 'login_falhou', motivo: 'Senha da house mix invalida' });
         return;
       }
+      chatDigitando.parar(cli);
       cli.tipo = 'housemix';
       cli.nome = 'House Mix';
       cli.autenticado = true;
       enviar(cli.ws, { tipo: 'login_ok', papel: 'housemix' });
+      enviarDigitando(cli);
       // Manda historico do chat e presenca
       for (const item of historicoChat) enviar(cli.ws, { tipo: 'chat', ...item });
       transmitirPresenca();
@@ -446,6 +461,7 @@ function tratarMensagem(cli, msg) {
         enviar(cli.ws, { tipo: 'login_falhou', motivo: 'Senha invalida (use a da house mix)' });
         return;
       }
+      chatDigitando.parar(cli);
       cli.tipo = 'espiao';
       cli.nome = 'Espiao';
       cli.autenticado = true;
@@ -477,6 +493,18 @@ function tratarMensagem(cli, msg) {
       break;
     }
 
+    // ----- PRE/POST PROCESSAMENTO DO CANAL NO FONE DELE -----
+    case 'set_processamento': {
+      if (!podeMexer(cli, msg.canal) || typeof msg.semProcessamento !== 'boolean') return;
+      const canalCfg = cli.musico.canais.find((c) => c.id === msg.canal);
+      const { canalMesa, tipo } = resolverCanal(canalCfg);
+      const r = mesa.setSemProcessamentoCanalAux(canalMesa, cli.musico.aux, msg.semProcessamento, tipo);
+      for (const aux of r.auxes) {
+        transmitirParaAux(aux, { tipo: 'parametro', canal: msg.canal, aux, campo: 'postproc', valor: r.valor });
+      }
+      break;
+    }
+
     // ----- MUSICO AJUSTA VOLUME GERAL DO FONE DELE -----
     case 'set_master': {
       if (cli.tipo !== 'musico' || !cli.autenticado) return;
@@ -501,12 +529,18 @@ function tratarMensagem(cli, msg) {
       break;
     }
 
+    case 'chat_digitando': {
+      chatDigitando.atualizar(cli, msg.ativo);
+      break;
+    }
+
     // ----- CHAT: musico manda mensagem para a house mix -----
     case 'chat': {
       if (!cli.autenticado) return;
       const midia = extrairMidia(msg);
       const texto = String(msg.texto || '').slice(0, 300);
       if (!texto && !midia.imagem && !midia.audio) return; // nada para mandar
+      chatDigitando.parar(cli);
       const item = {
         de: cli.nome || 'Anonimo',
         papel: cli.tipo,
@@ -548,6 +582,7 @@ function tratarMensagem(cli, msg) {
       const midia = extrairMidia(msg);
       const texto = String(msg.texto || '').slice(0, 300);
       if (!texto && !midia.imagem && !midia.audio) return;
+      chatDigitando.parar(cli);
       const item = {
         de: 'House Mix',
         papel: 'housemix',
@@ -601,6 +636,7 @@ function enviarEstadoInicial(cli) {
     // mesa.caminhoMix() aponta para o campo real "mute" (1=mutado); o app
     // fala em "mix" (1=ligado) — invertemos aqui, igual no repasse ao vivo.
     const mute = mesa.getEstado(mesa.caminhoMix(canalMesa, aux, tipo));
+    const postproc = mesa.getEstado(mesa.caminhoProcessamento(canalMesa, aux, tipo));
     const mix = mute == null ? 1 : (Number(mute) === 0 ? 1 : 0);
     enviar(cli.ws, {
       tipo: 'estado_canal',
@@ -608,6 +644,7 @@ function enviarEstadoInicial(cli) {
       aux,
       nivel: nivel == null ? 0.5 : nivel,
       mix,
+      postproc,
     });
   }
   const master = mesa.getEstado(mesa.caminhoMasterAux(aux));

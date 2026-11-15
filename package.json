@@ -6,7 +6,8 @@
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",
-    "sim": "node server/ui24-simulator.js"
+    "sim": "node server/ui24-simulator.js",
+    "test": "node --test"
   },
   "author": "Grupo Elo / House Mix",
   "license": "MIT",

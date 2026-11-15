@@ -242,11 +242,21 @@ html, body {
   font-size: 12px; font-weight: 500; color: #cfd4dd; letter-spacing: .5px; }
 
 .btn-on {
+  touch-action: none;
   margin: 5px 7px 8px; padding: 7px 0; border-radius: 6px;
   display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;
   font-size: 11px; font-weight: 600; letter-spacing: 1.5px; user-select: none; transition: all .15s;
 }
 .btn-on .led-btn { width: 7px; height: 7px; border-radius: 50%; }
+
+.btn-processamento {
+  touch-action: none; margin: 0 7px 8px; padding: 6px 3px; min-height: 32px;
+  border: 1px solid #3a3d44; border-radius: 6px; background: #14151a; color: var(--texto);
+  font-family: inherit; font-size: 10px; line-height: 1.15; cursor: pointer;
+}
+.btn-processamento.ativo { color: var(--amarelo); background: #302610; border-color: var(--amarelo); }
+.btn-processamento:disabled { opacity: .45; cursor: wait; }
+.btn-processamento:focus-visible { outline: 2px solid var(--amarelo); outline-offset: 2px; }
 
 /* Cabecalho "CANAIS · N / deslize ->", so aparece no modo retrato (ver media
    query abaixo) — no resto (paisagem/desktop) fica escondido. */
@@ -387,6 +397,11 @@ html, body {
 }
 .rapida:active { background: #2b62d6; border-color: #2b62d6; color: #fff; }
 
+.chat-digitando {
+  min-height: 28px; padding: 4px 8px; color: var(--verde-led); font-size: 13px;
+  font-weight: 600; border-radius: 6px;
+}
+.chat-digitando:not(:empty) { background: #10231a; border-left: 3px solid var(--verde-led); }
 .chat-envio { display: flex; gap: 8px; align-items: center; }
 
 /* botao redondo, minimalista (so o icone, sem texto) — foto e cancelar */
@@ -471,6 +486,7 @@ html, body {
   .canal-valor { font-size: 10px; padding: 1px 2px; }
   .btn-on { margin: 3px 4px 5px; padding: 4px 0; font-size: 9px; gap: 4px; }
   .btn-on .led-btn { width: 5px; height: 5px; }
+  .btn-processamento { margin: 0 4px 5px; padding: 4px 2px; min-height: 28px; font-size: 9px; }
 
   /* GERAL: 5 botoes empilhados cabiam mal numa tela baixa — encolhe. */
   #painel-geral.ativo { gap: 8px; }

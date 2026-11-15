@@ -71,7 +71,7 @@ html, body {
 /* -------------------- CONSOLE -------------------- */
 #tela-monitor { padding: 0; }
 .console {
-  position: relative; width: 100%; min-height: 100vh; min-height: 100dvh;
+  position: relative; width: 100%; height: 100vh; height: 100dvh; min-height: 0;
   display: flex; flex-direction: column; padding: 18px 20px 22px;
   background: radial-gradient(130% 90% at 50% -10%, #16181e 0%, #0b0c0f 62%, #08090b 100%);
 }
@@ -117,7 +117,7 @@ html, body {
 
 /* mensagens grandes */
 .mensagens {
-  flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding: 20px;
+  flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding: 20px;
   background: linear-gradient(180deg,#141519,#0f1014); border: 1px solid var(--borda); border-radius: 10px;
   box-shadow: inset 0 1px 3px rgba(0,0,0,.5);
 }
@@ -126,6 +126,7 @@ html, body {
 /* mensagem agrupada (mesma pessoa, logo em seguida): sem cabecalho, colada na de cima */
 .cartao.agrupada { margin-top: -8px; }
 .cartao {
+  flex-shrink: 0;
   background: linear-gradient(180deg,#1c1e25,#161820); border: 1px solid var(--borda); border-left: 5px solid var(--azul);
   border-radius: 10px; padding: 16px 22px; box-shadow: 0 2px 6px rgba(0,0,0,.4); animation: entrar .25s ease-out;
 }
@@ -151,6 +152,12 @@ html, body {
 .msg-audio { display: block; width: 100%; max-width: 420px; margin-top: 10px; }
 
 /* rodape */
+.chat-digitando {
+  flex-shrink: 0; min-height: 32px; padding: 5px 10px; margin-bottom: 8px;
+  color: var(--verde-led); font-size: 16px; font-weight: 600; border-radius: 6px;
+}
+.chat-digitando:not(:empty) { background: #10231a; border-left: 3px solid var(--verde-led); }
+.topo, .resposta { flex-shrink: 0; }
 .resposta {
   display: flex; gap: 12px; padding: 14px 0 0;
 }
